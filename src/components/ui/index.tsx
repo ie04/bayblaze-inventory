@@ -57,9 +57,9 @@ export function Button({
       "border-[var(--bb-line)] bg-[var(--bb-surface-warm)] text-[var(--bb-charcoal)] hover:border-[var(--bb-blaze)]",
   }[variant];
   const sizeClass = {
-    sm: "min-h-11 rounded-2xl px-4 text-sm",
-    md: "min-h-14 rounded-2xl px-5 text-base",
-    lg: "min-h-16 rounded-[24px] px-6 text-lg",
+    sm: "min-h-10 rounded-2xl px-3 text-sm md:min-h-11 md:px-4",
+    md: "min-h-12 rounded-2xl px-4 text-base md:min-h-14 md:px-5",
+    lg: "min-h-14 rounded-[20px] px-5 text-base md:min-h-16 md:rounded-[24px] md:px-6 md:text-lg",
     icon: "size-12 rounded-full p-0",
   }[size];
 
@@ -109,7 +109,7 @@ export function Card({
   return (
     <Component
       className={cx(
-        "rounded-[var(--bb-radius-card)] border p-5",
+        "rounded-[20px] border p-4 md:rounded-[var(--bb-radius-card)] md:p-5",
         elevated ? "shadow-[var(--bb-shadow-card)]" : "shadow-[var(--bb-shadow-soft)]",
         interactive && "transition hover:border-[var(--bb-blaze)]",
         toneClass,
@@ -169,13 +169,13 @@ export function Input({ className, icon, label, ...props }: FieldProps) {
       ) : null}
       <span
         className={cx(
-          "flex min-h-14 items-center gap-3 rounded-2xl border border-[var(--bb-line)] bg-white px-4 shadow-[var(--bb-shadow-soft)] focus-within:border-[var(--bb-blaze)]",
+          "flex min-h-12 items-center gap-2 rounded-2xl border border-[var(--bb-line)] bg-white px-3 shadow-[var(--bb-shadow-soft)] focus-within:border-[var(--bb-blaze)] md:min-h-14 md:gap-3 md:px-4",
           focusRing,
         )}
       >
         {icon ? <span className="shrink-0 text-[var(--bb-charcoal)]">{icon}</span> : null}
         <input
-          className="min-w-0 flex-1 bg-transparent py-3 text-base font-semibold text-[var(--bb-charcoal)] outline-none placeholder:text-[var(--bb-muted)]"
+          className="min-w-0 flex-1 bg-transparent py-2.5 text-base font-semibold text-[var(--bb-charcoal)] outline-none placeholder:text-[var(--bb-muted)] md:py-3"
           {...props}
         />
       </span>
@@ -220,7 +220,7 @@ export function Select({
       ) : null}
       <select
         className={cx(
-          "min-h-14 w-full rounded-2xl border border-[var(--bb-line)] bg-white px-4 text-base font-black text-[var(--bb-charcoal)] outline-none focus:border-[var(--bb-blaze)]",
+          "min-h-12 w-full rounded-2xl border border-[var(--bb-line)] bg-white px-3 text-base font-black text-[var(--bb-charcoal)] outline-none focus:border-[var(--bb-blaze)] md:min-h-14 md:px-4",
           focusRing,
         )}
         {...props}
@@ -252,7 +252,7 @@ export function AppShell({
         login
           ? "flex min-h-svh w-full flex-col bg-[length:auto_80%] bg-center bg-no-repeat md:bg-[length:auto_130%]"
           : cx(
-              "mx-auto flex min-h-svh w-full flex-col bg-white shadow-[var(--bb-shadow-shell)] md:my-6 md:min-h-[calc(100svh-3rem)] md:overflow-hidden md:rounded-[28px]",
+              "mx-auto flex min-h-svh w-full flex-col bg-white shadow-none md:my-6 md:min-h-[calc(100svh-3rem)] md:overflow-hidden md:rounded-[28px] md:shadow-[var(--bb-shadow-shell)]",
               wide ? "max-w-6xl" : "max-w-md",
             ),
         className,
@@ -280,7 +280,7 @@ export function PageHeader({
   subtitle?: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div className="min-w-0">
         {eyebrow ? (
           <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">
@@ -289,11 +289,11 @@ export function PageHeader({
         ) : null}
         <div className="flex items-center gap-3">
           {icon ? (
-            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[var(--bb-surface-warm)] text-[var(--bb-charcoal)]">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[var(--bb-surface-warm)] text-[var(--bb-charcoal)] md:size-12">
               {icon}
             </span>
           ) : null}
-          <h2 className="text-3xl font-black leading-tight text-[var(--bb-charcoal)]">
+          <h2 className="text-2xl font-black leading-tight text-[var(--bb-charcoal)] md:text-3xl">
             {title}
           </h2>
         </div>
@@ -303,7 +303,7 @@ export function PageHeader({
           </p>
         ) : null}
       </div>
-      {actions ? <div className="shrink-0">{actions}</div> : null}
+      {actions ? <div className="w-full shrink-0 md:w-auto">{actions}</div> : null}
     </div>
   );
 }
@@ -318,7 +318,7 @@ export function SectionHeader({
   subtitle?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-start justify-between gap-3 md:items-center">
       <div className="min-w-0">
         <h3 className="text-lg font-black text-[var(--bb-charcoal)]">{title}</h3>
         {subtitle ? (
@@ -490,7 +490,7 @@ export function MetricCard({
         {icon}
         {label}
       </div>
-      <p className="mt-1 truncate text-sm font-black text-[var(--bb-charcoal)]">
+      <p className="mt-1 truncate text-base font-black text-[var(--bb-charcoal)] md:text-sm">
         {value}
       </p>
     </div>
@@ -594,7 +594,7 @@ export function ActionBar({
   columns?: 2 | 3;
 }) {
   return (
-    <div className={cx("grid gap-3", columns === 3 ? "grid-cols-3" : "grid-cols-2", className)}>
+    <div className={cx("grid gap-3", columns === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2", className)}>
       {children}
     </div>
   );

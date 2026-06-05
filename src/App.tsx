@@ -145,15 +145,15 @@ function App() {
     <AppShell
       wide
       header={
-        <header className="border-b border-[var(--bb-line)] bg-white/95 px-5 py-4 backdrop-blur md:px-7">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <header className="border-b border-[var(--bb-line)] bg-white/95 px-4 py-3 backdrop-blur md:px-7 md:py-4">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">BayBlaze</p>
               <h1 className="text-2xl font-black uppercase leading-tight text-[var(--bb-charcoal)]">
                 Inventory
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <StatusBadge
                 status={snapshot?.source === "api" ? "Medusa API" : "Demo data"}
                 tone={snapshot?.source === "api" ? "success" : "warning"}
@@ -174,15 +174,15 @@ function App() {
         </header>
       }
       footer={
-        <footer className="border-t border-[var(--bb-line)] bg-white/95 px-3 py-3 backdrop-blur md:hidden">
+        <footer className="border-t border-[var(--bb-line)] bg-white/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
           <nav className="grid grid-cols-6 gap-1" aria-label="Inventory navigation">
             {views.map((item) => (
               <button
                 key={item.id}
                 aria-label={item.label}
-                className={`grid min-h-14 place-items-center rounded-2xl text-[11px] font-black transition ${
+                className={`grid min-h-13 place-items-center gap-1 rounded-2xl px-1 py-1.5 text-[10px] font-black transition ${
                   activeView === item.id
-                    ? "bg-[var(--bb-blaze-soft)] text-[var(--bb-charcoal)]"
+                    ? "bg-[var(--bb-blaze-soft)] text-[var(--bb-charcoal)] shadow-[var(--bb-shadow-soft)]"
                     : "text-[var(--bb-muted)]"
                 }`}
                 onClick={() => setActiveView(item.id)}
@@ -216,8 +216,8 @@ function App() {
             ))}
           </nav>
         </aside>
-        <section className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-7">
-          <div className="page-transition mx-auto flex min-h-0 w-full max-w-5xl flex-col gap-5">
+        <section className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-7 md:py-5">
+          <div className="page-transition mx-auto flex min-h-0 w-full max-w-5xl flex-col gap-4 md:gap-5">
             {error ? <ErrorState>{error}</ErrorState> : null}
             {snapshot?.source === "demo" ? (
               <InlineNotice tone="warning">
@@ -391,7 +391,7 @@ function OverviewView({
             ))}
           </div>
         </Card>
-        <Card>
+        <Card className="p-3 md:p-5">
           <SectionHeader title="Needs attention" subtitle="Low stock and metadata problems." />
           <div className="mt-4 space-y-3">
             {lowStock.length === 0 && issues.length === 0 ? (
@@ -578,7 +578,7 @@ function VehiclesView({
                     <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">
                       {vehicle.plate ?? "No plate"}
                     </p>
-                    <h2 className="mt-1 text-2xl font-black text-[var(--bb-charcoal)]">
+                    <h2 className="mt-1 text-xl font-black text-[var(--bb-charcoal)] md:text-2xl">
                       {vehicle.label}
                     </h2>
                   </div>
@@ -591,7 +591,7 @@ function VehiclesView({
                     assigned.map((variant) => (
                       <div
                         key={variant.id}
-                        className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--bb-surface-warm)] p-3"
+                        className="grid gap-3 rounded-2xl bg-[var(--bb-surface-warm)] p-3 sm:flex sm:items-center sm:justify-between"
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">
@@ -601,7 +601,7 @@ function VehiclesView({
                             {variant.title} - {variant.sku}
                           </p>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-start">
                           <Badge tone="brand">{variant.metadata.availableQuantity}</Badge>
                           <Button
                             aria-label={`Move ${variant.title} to warehouse`}
@@ -638,11 +638,11 @@ function ContractView({ issues, products }: { issues: ContractIssue[]; products:
       />
       <Card tone={issues.length ? "warm" : "default"} elevated>
         <div className="flex items-start gap-3">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-white text-[var(--bb-charcoal)]">
+          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-white text-[var(--bb-charcoal)] md:size-12">
             {issues.length ? <AlertTriangle size={23} aria-hidden="true" /> : <CheckCircle2 size={23} aria-hidden="true" />}
           </span>
           <div>
-            <h2 className="text-2xl font-black text-[var(--bb-charcoal)]">
+            <h2 className="text-xl font-black leading-tight text-[var(--bb-charcoal)] md:text-2xl">
               {issues.length ? `${issues.length} contract checks need attention` : "Metadata contract is clean"}
             </h2>
             <p className="mt-2 text-sm font-semibold leading-6 text-[var(--bb-muted)]">
@@ -695,20 +695,20 @@ function ProductCard({
   return (
     <button className="w-full text-left" onClick={onSelect} type="button">
       <Card interactive>
-        <div className="flex items-start justify-between gap-3">
+        <div className="grid gap-3 sm:flex sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <ProductThumbnail product={product} />
             <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-xl font-black text-[var(--bb-charcoal)]">{product.title}</h2>
+              <h2 className="max-w-full truncate text-lg font-black text-[var(--bb-charcoal)] md:text-xl">{product.title}</h2>
               <StatusBadge status={product.status} tone={product.status === "published" ? "success" : "warning"} />
             </div>
-            <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+            <p className="mt-1 break-words text-sm font-bold text-[var(--bb-muted)]">
               {product.category} - /{product.handle}
             </p>
             </div>
           </div>
-          <Badge tone="brand">{units} units</Badge>
+          <Badge className="w-fit" tone="brand">{units} units</Badge>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {product.variants.map((variant) => (
@@ -751,16 +751,16 @@ function ProductEditorDialog({
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/45 p-3 md:p-6" role="dialog" aria-modal="true">
-      <div className="mx-auto flex max-h-[calc(100svh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[var(--bb-radius-shell)] bg-white shadow-[var(--bb-shadow-shell)] md:max-h-[calc(100svh-3rem)]">
-        <header className="flex items-start justify-between gap-3 border-b border-[var(--bb-line)] px-5 py-4">
+    <div className="fixed inset-0 z-50 bg-black/45 p-2 md:p-6" role="dialog" aria-modal="true">
+      <div className="mx-auto flex max-h-[calc(100svh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--bb-shadow-shell)] md:max-h-[calc(100svh-3rem)] md:rounded-[var(--bb-radius-shell)]">
+        <header className="flex items-start justify-between gap-3 border-b border-[var(--bb-line)] px-4 py-3 md:px-5 md:py-4">
           <div className="flex min-w-0 items-start gap-3">
             <ProductThumbnail product={product} />
             <div className="min-w-0">
               <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">
                 Product editor
               </p>
-              <h2 className="truncate text-2xl font-black text-[var(--bb-charcoal)]">
+              <h2 className="truncate text-xl font-black text-[var(--bb-charcoal)] md:text-2xl">
                 {product.title}
               </h2>
               <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
@@ -772,7 +772,7 @@ function ProductEditorDialog({
             <X size={18} aria-hidden="true" />
           </Button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-5 md:py-5">
           <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
             <div className="space-y-5">
               <ProductDetailsCard
@@ -980,7 +980,7 @@ function ProductDetailsCard({
 
 function ProductThumbnail({ product }: { product: InventoryProduct }) {
   return (
-    <span className="grid size-16 shrink-0 overflow-hidden rounded-2xl bg-[var(--bb-surface-warm)] text-[var(--bb-muted)]">
+    <span className="grid size-14 shrink-0 overflow-hidden rounded-2xl bg-[var(--bb-surface-warm)] text-[var(--bb-muted)] md:size-16">
       {product.thumbnail ? (
         <img alt="" className="size-full object-cover" src={product.thumbnail} />
       ) : (
