@@ -43,7 +43,8 @@ creating new primitives.
   provided either as `FIREBASE_SERVICE_ACCOUNT_JSON` or as
   `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`.
   This keeps Firestore as the driver vehicle source while Medusa remains the
-  inventory/product source.
+  inventory/product source. Firestore vehicle sync must be non-fatal: if it
+  fails, the proxy should still return Medusa inventory with a warning.
 - Production Vercel settings should use:
   `VITE_BAYBLAZE_INVENTORY_API_URL=/api`,
   `MEDUSA_BACKEND_URL=https://api.bayblaze.net`, and

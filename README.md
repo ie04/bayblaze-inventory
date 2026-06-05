@@ -41,7 +41,9 @@ admin tokens or BayBlaze service tokens in Vite environment variables.
 
 The Vercel `/api/inventory` proxy reads Medusa inventory and then merges active
 vehicles from Firebase Firestore. Vehicles are not stored in Medusa; Firestore
-remains the vehicle source used by the driver app.
+remains the vehicle source used by the driver app. Firestore vehicle sync is
+non-fatal: if Firebase Admin is misconfigured or Firestore is unavailable, the
+app still loads Medusa inventory and shows a warning.
 
 Current frontend adapter shape:
 

@@ -49,6 +49,7 @@ export type InventorySnapshot = {
   vehicles: DeliveryVehicle[];
   lastSyncedAt: string;
   source: "api" | "demo";
+  warnings?: string[];
 };
 
 export type ProductDraft = {

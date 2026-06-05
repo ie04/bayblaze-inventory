@@ -225,6 +225,11 @@ function App() {
                 VITE_BAYBLAZE_INVENTORY_API_URL=/api in Vercel and redeploy to use Medusa inventory.
               </InlineNotice>
             ) : null}
+            {snapshot?.warnings?.map((warning) => (
+              <InlineNotice key={warning} tone="warning">
+                {warning}
+              </InlineNotice>
+            ))}
             {loading && !snapshot ? <LoadingState label="Loading inventory" /> : activeScreen}
           </div>
         </section>

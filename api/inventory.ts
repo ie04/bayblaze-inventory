@@ -29,6 +29,7 @@ type InventorySnapshot = {
   vehicles?: DeliveryVehicle[];
   lastSyncedAt?: string;
   source?: string;
+  warnings?: string[];
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -44,15 +45,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ message: "Method not allowed." });
   }
 
-  const medusaResponse = await fetch(`${backendUrl}/admin/bayblaze/inventory`, {
-    body: req.method === "POST" ? JSON.stringify(req.body ?? {}) : undefined,
-    headers: {
-      Authorization: `Bearer ${serviceToken}`,
-      "Content-Type": "application/json",
-      "x-bayblaze-service-token": serviceToken,
-    },
-    method: req.method,
-  });
+  let medusaResponse: Response;
+
+  try {
+    medusaResponse = await fetch(`${backendUrl}/admin/bayblaze/inventory`, {
+      body: req.method === "POST" ? JSON.stringify(req.body ?? {}) : undefined,
+      headers: {
+        Authorization: `Bearer ${serviceToken}`,
+        "Content-Type": "application/json",
+        "x-bayblaze-service-token": serviceToken,
+      },
+      method: req.method,
+    });
+  } catch (caught) {
+    console.error("Medusa inventory API request failed.", caught);
+
+    return res.status(502).json({
+      message: "Medusa inventory API could not be reached.",
+    });
+  }
 
   const responseText = await medusaResponse.text();
   let responseBody: unknown;
@@ -73,7 +84,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 async function mergeFirestoreVehicles(snapshot: InventorySnapshot) {
-  const firestoreVehicles = await listFirestoreVehicles();
+  let firestoreVehicles: DeliveryVehicle[];
+
+  try {
+    firestoreVehicles = await listFirestoreVehicles();
+  } catch (caught) {
+    console.warn("Firestore vehicle sync failed.", caught);
+
+    return {
+      ...snapshot,
+      warnings: [
+        ...(snapshot.warnings ?? []),
+        "Driver vehicles could not be synced from Firestore. Medusa inventory is still loaded.",
+      ],
+    };
+  }
 
   if (firestoreVehicles.length === 0) {
     return snapshot;
@@ -165,13 +190,17 @@ function getFirebaseAdminApp() {
     return undefined;
   }
 
-  return initializeApp({
-    credential: cert({
-      clientEmail,
-      privateKey,
-      projectId,
-    }),
-  });
+  try {
+    return initializeApp({
+      credential: cert({
+        clientEmail,
+        privateKey,
+        projectId,
+      }),
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 function isInventorySnapshot(value: unknown): value is InventorySnapshot {
