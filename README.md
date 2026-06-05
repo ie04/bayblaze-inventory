@@ -19,7 +19,15 @@ server-only proxy variables:
 ```env
 MEDUSA_BACKEND_URL=https://api.bayblaze.net
 BAYBLAZE_INVENTORY_SERVICE_TOKEN=
+FIREBASE_PROJECT_ID=bayblaze-driver
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
 ```
+
+`FIREBASE_SERVICE_ACCOUNT_JSON` can be used instead of
+`FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY`. These Firebase variables
+are server-only Vercel variables used by `/api/inventory` to merge active driver
+vehicles from Firestore `vehicles`.
 
 If the frontend API URL is empty, the app uses in-memory demo data so UI work
 can continue without a live backend. Demo data is not persisted.
@@ -28,6 +36,10 @@ can continue without a live backend. Demo data is not persisted.
 
 Browser code should call a trusted inventory API boundary. Do not expose Medusa
 admin tokens or BayBlaze service tokens in Vite environment variables.
+
+The Vercel `/api/inventory` proxy reads Medusa inventory and then merges active
+vehicles from Firebase Firestore. Vehicles are not stored in Medusa; Firestore
+remains the vehicle source used by the driver app.
 
 Current frontend adapter shape:
 

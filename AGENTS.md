@@ -38,11 +38,18 @@ creating new primitives.
   responsible for authenticating staff users and writing to Medusa.
 - Vercel server-only inventory proxy variables are `MEDUSA_BACKEND_URL` and
   `BAYBLAZE_INVENTORY_SERVICE_TOKEN`. Do not prefix these with `VITE_`.
+- The Vercel `/api/inventory` proxy also reads active vehicles from Firebase
+  Firestore `vehicles` with Firebase Admin. Server-only Firebase env may be
+  provided either as `FIREBASE_SERVICE_ACCOUNT_JSON` or as
+  `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`.
+  This keeps Firestore as the driver vehicle source while Medusa remains the
+  inventory/product source.
 - Production Vercel settings should use:
   `VITE_BAYBLAZE_INVENTORY_API_URL=/api`,
   `MEDUSA_BACKEND_URL=https://api.bayblaze.net`, and
   `BAYBLAZE_INVENTORY_SERVICE_TOKEN=<same value Medusa accepts as
-  x-bayblaze-service-token>`.
+  x-bayblaze-service-token>`. Add Firebase Admin server variables as above for
+  vehicle dropdowns.
 - When the inventory API is not configured or unavailable, the app falls back to
   demo data for local UX work. Demo mutations are in-memory only.
 
