@@ -6,15 +6,21 @@ import type {
   InventoryState,
   InventoryVariant,
   ProductDraft,
+  ProductUpdateDraft,
+  ProductWithVariantDraft,
   VariantDraft,
+  VariantUpdateDraft,
 } from "./types";
 
 const apiBaseUrl = import.meta.env.VITE_BAYBLAZE_INVENTORY_API_URL?.toString().replace(/\/$/, "");
 
 type InventoryMutation =
   | { type: "create-product"; draft: ProductDraft }
+  | { type: "create-product-with-variant"; draft: ProductWithVariantDraft }
   | { type: "create-variant"; productId: string; draft: VariantDraft }
+  | { type: "update-product-details"; productId: string; draft: ProductUpdateDraft }
   | { type: "update-product-image"; productId: string; imageUrl: string }
+  | { type: "update-variant-details"; variantId: string; draft: VariantUpdateDraft }
   | { type: "update-quantity"; variantId: string; quantity: number }
   | { type: "assign-vehicle"; variantId: string; vehicleId: string }
   | { type: "set-state"; variantId: string; state: InventoryState };
@@ -101,8 +107,8 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
   const products = structuredClone(snapshot.products);
   const updatedAt = new Date().toISOString();
 
-  if (mutation.type === "create-product") {
-    products.unshift({
+  if (mutation.type === "create-product" || mutation.type === "create-product-with-variant") {
+    const product: InventoryProduct = {
       id: crypto.randomUUID(),
       title: mutation.draft.title,
       handle: mutation.draft.handle,
@@ -110,7 +116,27 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
       category: mutation.draft.category,
       thumbnail: mutation.draft.imageUrl,
       variants: [],
-    });
+    };
+
+    products.unshift(product);
+
+    if (mutation.type === "create-product-with-variant") {
+      product.variants.push(toDemoVariant(product, mutation.draft.variant, updatedAt));
+    }
+  }
+
+  if (mutation.type === "update-product-details") {
+    const product = products.find((item) => item.id === mutation.productId);
+    if (product) {
+      product.title = mutation.draft.title ?? product.title;
+      product.handle = mutation.draft.handle ?? product.handle;
+      product.category = mutation.draft.category ?? product.category;
+      product.thumbnail = mutation.draft.imageUrl ?? product.thumbnail;
+      product.variants = product.variants.map((variant) => ({
+        ...variant,
+        productTitle: product.title,
+      }));
+    }
   }
 
   if (mutation.type === "update-product-image") {
@@ -123,27 +149,30 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
   if (mutation.type === "create-variant") {
     const product = products.find((item) => item.id === mutation.productId);
     if (product) {
-      product.variants.push({
-        id: crypto.randomUUID(),
-        productId: product.id,
-        productTitle: product.title,
-        title: mutation.draft.title,
-        sku: mutation.draft.sku,
-        priceCents: mutation.draft.priceCents,
-        metadata: {
-          inventoryState: mutation.draft.inventoryState,
-          availableQuantity: mutation.draft.quantity,
-          assignedVehicleId:
-            mutation.draft.inventoryState === "ON_VEHICLE" ? mutation.draft.vehicleId : undefined,
-          barcode: mutation.draft.barcode,
-          brand: mutation.draft.brand,
-        },
-        updatedAt,
-      });
+      product.variants.push(toDemoVariant(product, mutation.draft, updatedAt));
     }
   }
 
   const variant = findVariant(products, "variantId" in mutation ? mutation.variantId : "");
+  if (variant && mutation.type === "update-variant-details") {
+    const draft = mutation.draft;
+    variant.title = draft.title ?? variant.title;
+    variant.sku = draft.sku ?? variant.sku;
+    variant.priceCents = draft.priceCents ?? variant.priceCents;
+    variant.metadata = {
+      ...variant.metadata,
+      barcode: draft.barcode ?? variant.metadata.barcode,
+      brand: draft.brand ?? variant.metadata.brand,
+      inventoryState: draft.inventoryState ?? variant.metadata.inventoryState,
+      availableQuantity: draft.quantity ?? variant.metadata.availableQuantity,
+      assignedVehicleId:
+        draft.inventoryState === "IN_WAREHOUSE"
+          ? undefined
+          : draft.vehicleId ?? variant.metadata.assignedVehicleId,
+    };
+    variant.updatedAt = updatedAt;
+  }
+
   if (variant && mutation.type === "update-quantity") {
     variant.metadata.availableQuantity = mutation.quantity;
     variant.updatedAt = updatedAt;
@@ -167,6 +196,29 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
     ...snapshot,
     products,
     lastSyncedAt: updatedAt,
+  };
+}
+
+function toDemoVariant(
+  product: InventoryProduct,
+  draft: VariantDraft,
+  updatedAt: string,
+): InventoryVariant {
+  return {
+    id: crypto.randomUUID(),
+    productId: product.id,
+    productTitle: product.title,
+    title: draft.title,
+    sku: draft.sku,
+    priceCents: draft.priceCents,
+    metadata: {
+      inventoryState: draft.inventoryState,
+      availableQuantity: draft.quantity,
+      assignedVehicleId: draft.inventoryState === "ON_VEHICLE" ? draft.vehicleId : undefined,
+      barcode: draft.barcode,
+      brand: draft.brand,
+    },
+    updatedAt,
   };
 }
 

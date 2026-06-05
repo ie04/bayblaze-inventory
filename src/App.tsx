@@ -41,15 +41,18 @@ import type {
   InventorySnapshot,
   InventoryState,
   InventoryVariant,
-  ProductDraft,
+  ProductUpdateDraft,
+  ProductWithVariantDraft,
   VariantDraft,
+  VariantUpdateDraft,
 } from "./lib/types";
 
-type View = "overview" | "products" | "stock" | "vehicles" | "contract";
+type View = "overview" | "products" | "add-product" | "stock" | "vehicles" | "contract";
 
 const views: Array<{ id: View; icon: ReactNode; label: string }> = [
   { id: "overview", icon: <LayoutDashboard size={18} aria-hidden="true" />, label: "Overview" },
   { id: "products", icon: <PackagePlus size={18} aria-hidden="true" />, label: "Products" },
+  { id: "add-product", icon: <Plus size={18} aria-hidden="true" />, label: "Add" },
   { id: "stock", icon: <Barcode size={18} aria-hidden="true" />, label: "Stock" },
   { id: "vehicles", icon: <Truck size={18} aria-hidden="true" />, label: "Vehicles" },
   { id: "contract", icon: <ClipboardCheck size={18} aria-hidden="true" />, label: "Contract" },
@@ -110,12 +113,21 @@ function App() {
       variants={filteredVariants}
       vehicles={snapshot.vehicles}
       view={activeView}
-      onCreateProduct={(draft) => void applyMutation({ type: "create-product", draft })}
+      onCreateProductWithVariant={(draft) =>
+        void applyMutation({ type: "create-product-with-variant", draft })
+      }
       onCreateVariant={(productId, draft) =>
         void applyMutation({ type: "create-variant", productId, draft })
       }
+      onOpenAddProduct={() => setActiveView("add-product")}
       onUpdateProductImage={(productId, imageUrl) =>
         void applyMutation({ type: "update-product-image", productId, imageUrl })
+      }
+      onUpdateProductDetails={(productId, draft) =>
+        void applyMutation({ type: "update-product-details", productId, draft })
+      }
+      onUpdateVariantDetails={(variantId, draft) =>
+        void applyMutation({ type: "update-variant-details", variantId, draft })
       }
       onQueryChange={setQuery}
       onSetState={(variantId, state) => void applyMutation({ type: "set-state", variantId, state })}
@@ -162,7 +174,7 @@ function App() {
       }
       footer={
         <footer className="border-t border-[var(--bb-line)] bg-white/95 px-3 py-3 backdrop-blur md:hidden">
-          <nav className="grid grid-cols-5 gap-1" aria-label="Inventory navigation">
+          <nav className="grid grid-cols-6 gap-1" aria-label="Inventory navigation">
             {views.map((item) => (
               <button
                 key={item.id}
@@ -224,9 +236,12 @@ function InventoryScreen({
   vehicles,
   view,
   onAssignVehicle,
-  onCreateProduct,
+  onCreateProductWithVariant,
   onCreateVariant,
+  onOpenAddProduct,
+  onUpdateProductDetails,
   onUpdateProductImage,
+  onUpdateVariantDetails,
   onQueryChange,
   onSetState,
   onUpdateQuantity,
@@ -240,9 +255,12 @@ function InventoryScreen({
   vehicles: DeliveryVehicle[];
   view: View;
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
-  onCreateProduct: (draft: ProductDraft) => void;
+  onCreateProductWithVariant: (draft: ProductWithVariantDraft) => void;
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
+  onOpenAddProduct: () => void;
+  onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductImage: (productId: string, imageUrl: string) => void;
+  onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
   onQueryChange: (query: string) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
@@ -253,9 +271,20 @@ function InventoryScreen({
         busy={busy}
         products={products}
         vehicles={vehicles}
-        onCreateProduct={onCreateProduct}
         onCreateVariant={onCreateVariant}
+        onOpenAddProduct={onOpenAddProduct}
+        onUpdateProductDetails={onUpdateProductDetails}
         onUpdateProductImage={onUpdateProductImage}
+      />
+    );
+  }
+
+  if (view === "add-product") {
+    return (
+      <AddProductFlow
+        busy={busy}
+        vehicles={vehicles}
+        onCreateProductWithVariant={onCreateProductWithVariant}
       />
     );
   }
@@ -270,6 +299,7 @@ function InventoryScreen({
         onAssignVehicle={onAssignVehicle}
         onQueryChange={onQueryChange}
         onSetState={onSetState}
+        onUpdateVariantDetails={onUpdateVariantDetails}
         onUpdateQuantity={onUpdateQuantity}
       />
     );
@@ -372,15 +402,17 @@ function ProductsView({
   busy,
   products,
   vehicles,
-  onCreateProduct,
   onCreateVariant,
+  onOpenAddProduct,
+  onUpdateProductDetails,
   onUpdateProductImage,
 }: {
   busy: boolean;
   products: InventoryProduct[];
   vehicles: DeliveryVehicle[];
-  onCreateProduct: (draft: ProductDraft) => void;
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
+  onOpenAddProduct: () => void;
+  onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductImage: (productId: string, imageUrl: string) => void;
 }) {
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? "");
@@ -394,6 +426,12 @@ function ProductsView({
         icon={<PackagePlus size={24} aria-hidden="true" />}
         title="Products and variants"
         subtitle="Create product shells, then define every sellable unit at the variant level."
+        actions={
+          <Button onClick={onOpenAddProduct} size="sm">
+            <Plus size={18} aria-hidden="true" />
+            Add
+          </Button>
+        }
       />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-3">
@@ -407,12 +445,19 @@ function ProductsView({
           ))}
         </div>
         <div className="space-y-5">
-          <CreateProductCard busy={busy} onCreateProduct={onCreateProduct} />
+          <Card>
+            <SectionHeader title="Add product" subtitle="Use the guided mobile-friendly product flow." />
+            <Button className="mt-4" fullWidth onClick={onOpenAddProduct}>
+              <Plus size={18} aria-hidden="true" />
+              Start product flow
+            </Button>
+          </Card>
           {selectedProduct ? (
-            <ProductImageCard
+            <ProductDetailsCard
               busy={busy}
               key={selectedProduct.id}
               product={selectedProduct}
+              onUpdateProductDetails={onUpdateProductDetails}
               onUpdateProductImage={onUpdateProductImage}
             />
           ) : null}
@@ -438,6 +483,7 @@ function StockView({
   onAssignVehicle,
   onQueryChange,
   onSetState,
+  onUpdateVariantDetails,
   onUpdateQuantity,
 }: {
   busy: boolean;
@@ -447,6 +493,7 @@ function StockView({
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
   onQueryChange: (query: string) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
+  onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
 }) {
   return (
@@ -473,14 +520,14 @@ function StockView({
           </EmptyState>
         ) : (
           variants.map((variant) => (
-            <VariantStockRow
+            <VariantContractCard
               busy={busy}
               key={`${variant.id}-${variant.updatedAt}-${variant.metadata.availableQuantity}`}
-              showStateControl
               variant={variant}
               vehicles={vehicles}
               onAssignVehicle={onAssignVehicle}
               onSetState={onSetState}
+              onUpdateVariantDetails={onUpdateVariantDetails}
               onUpdateQuantity={onUpdateQuantity}
             />
           ))
@@ -671,92 +718,147 @@ function ProductCard({
   );
 }
 
-function CreateProductCard({
+function AddProductFlow({
   busy,
-  onCreateProduct,
+  vehicles,
+  onCreateProductWithVariant,
 }: {
   busy: boolean;
-  onCreateProduct: (draft: ProductDraft) => void;
+  vehicles: DeliveryVehicle[];
+  onCreateProductWithVariant: (draft: ProductWithVariantDraft) => void;
 }) {
+  const [brand, setBrand] = useState("");
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [variantTitle, setVariantTitle] = useState("");
+  const [sku, setSku] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [price, setPrice] = useState("");
+  const [inventoryState, setInventoryState] = useState<InventoryState>("IN_WAREHOUSE");
+  const [availableQuantity, setAvailableQuantity] = useState(0);
+  const [vehicleId, setVehicleId] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!title.trim() || !handle.trim() || !category.trim()) {
+
+    if (!title.trim() || !handle.trim() || !category.trim() || !variantTitle.trim() || !sku.trim()) {
       return;
     }
 
-    onCreateProduct({
+    onCreateProductWithVariant({
       title: title.trim(),
       handle: handle.trim(),
       category: category.trim(),
       imageUrl: imageUrl.trim() || undefined,
+      variant: {
+        barcode: barcode.trim() || undefined,
+        brand: brand.trim() || undefined,
+        inventoryState,
+        priceCents: dollarsToCents(price),
+        quantity: availableQuantity,
+        sku: sku.trim(),
+        title: variantTitle.trim(),
+        vehicleId: inventoryState === "ON_VEHICLE" ? vehicleId || undefined : undefined,
+      },
     });
-    setTitle("");
-    setHandle("");
-    setCategory("");
-    setImageUrl("");
   }
 
   return (
-    <Card>
-      <SectionHeader title="Add product" subtitle="Create the Medusa product shell first." />
-      <form className="mt-4 space-y-3" onSubmit={submit}>
-        <Input label="Product name" onChange={(event) => setTitle(event.target.value)} value={title} />
-        <Input label="Handle" onChange={(event) => setHandle(event.target.value)} placeholder="raz-tn9000" value={handle} />
-        <Input label="Category" onChange={(event) => setCategory(event.target.value)} placeholder="Vapes" value={category} />
-        <Input
-          icon={<Image size={18} aria-hidden="true" />}
-          label="Product image URL"
-          onChange={(event) => setImageUrl(event.target.value)}
-          placeholder="https://..."
-          type="url"
-          value={imageUrl}
-        />
-        <Button fullWidth loading={busy} type="submit">
-          <Plus size={18} aria-hidden="true" />
-          Add product
-        </Button>
+    <>
+      <PageHeader
+        eyebrow="New item"
+        icon={<PackagePlus size={24} aria-hidden="true" />}
+        title="Add product"
+        subtitle="Create the product and its first sellable variant together."
+      />
+      <form className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]" onSubmit={submit}>
+        <Card elevated>
+          <SectionHeader title="Product" subtitle="Storefront catalog details." />
+          <div className="mt-4 grid gap-3">
+            <Input label="Brand" onChange={(event) => setBrand(event.target.value)} placeholder="RAZ" value={brand} />
+            <Input label="Product name" onChange={(event) => setTitle(event.target.value)} placeholder="RAZ TN9000" value={title} />
+            <Input label="Product handle" onChange={(event) => setHandle(event.target.value)} placeholder="raz-tn9000" value={handle} />
+            <Input label="Category" onChange={(event) => setCategory(event.target.value)} placeholder="Vapes" value={category} />
+            <Input icon={<Image size={18} aria-hidden="true" />} label="Product image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />
+          </div>
+        </Card>
+        <Card elevated>
+          <SectionHeader title="First variant" subtitle="Variant-level contract data." />
+          <div className="mt-4 grid gap-3">
+            <Input label="Variant name" onChange={(event) => setVariantTitle(event.target.value)} placeholder="Blue Razz Ice" value={variantTitle} />
+            <Input label="SKU" onChange={(event) => setSku(event.target.value)} placeholder="RAZ-TN9000-BRI" value={sku} />
+            <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input label="Price" min={0} onChange={(event) => setPrice(event.target.value)} placeholder="24.99" step="0.01" type="number" value={price} />
+              <Input label="Available quantity" min={0} onChange={(event) => setAvailableQuantity(Number(event.target.value))} type="number" value={availableQuantity} />
+            </div>
+            <Select label="Stock location" onChange={(event) => setInventoryState(event.target.value as InventoryState)} value={inventoryState}>
+              <option value="IN_WAREHOUSE">In warehouse</option>
+              <option value="ON_VEHICLE">On vehicle</option>
+            </Select>
+            {inventoryState === "ON_VEHICLE" ? (
+              <Select label="Delivery vehicle" onChange={(event) => setVehicleId(event.target.value)} value={vehicleId}>
+                <option value="">Choose vehicle</option>
+                {vehicles
+                  .filter((vehicle) => vehicle.id !== "warehouse")
+                  .map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.label}
+                    </option>
+                  ))}
+              </Select>
+            ) : null}
+            <Button fullWidth loading={busy} type="submit">
+              <Plus size={18} aria-hidden="true" />
+              Create product
+            </Button>
+          </div>
+        </Card>
       </form>
-    </Card>
+    </>
   );
 }
 
-function ProductImageCard({
+function ProductDetailsCard({
   busy,
   product,
+  onUpdateProductDetails,
   onUpdateProductImage,
 }: {
   busy: boolean;
   product: InventoryProduct;
+  onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductImage: (productId: string, imageUrl: string) => void;
 }) {
+  const [title, setTitle] = useState(product.title);
+  const [handle, setHandle] = useState(product.handle);
+  const [category, setCategory] = useState(product.category);
   const [imageUrl, setImageUrl] = useState(product.thumbnail ?? "");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextImageUrl = imageUrl.trim();
 
-    if (!nextImageUrl) {
-      return;
-    }
+    onUpdateProductDetails(product.id, {
+      category: category.trim(),
+      handle: handle.trim(),
+      imageUrl: nextImageUrl || undefined,
+      title: title.trim(),
+    });
 
-    onUpdateProductImage(product.id, nextImageUrl);
+    if (nextImageUrl) {
+      onUpdateProductImage(product.id, nextImageUrl);
+    }
   }
 
   return (
     <Card>
-      <SectionHeader title="Product photo" subtitle={product.title} />
+      <SectionHeader title="Product details" subtitle="Edit catalog fields and photo." />
       <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
         {imageUrl.trim() ? (
-          <img
-            alt=""
-            className="aspect-[4/3] w-full object-cover"
-            src={imageUrl.trim()}
-          />
+          <img alt="" className="aspect-[4/3] w-full object-cover" src={imageUrl.trim()} />
         ) : (
           <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
             <Image size={32} aria-hidden="true" />
@@ -764,16 +866,12 @@ function ProductImageCard({
         )}
       </div>
       <form className="mt-4 space-y-3" onSubmit={submit}>
-        <Input
-          icon={<Image size={18} aria-hidden="true" />}
-          label="Image URL"
-          onChange={(event) => setImageUrl(event.target.value)}
-          placeholder="https://..."
-          type="url"
-          value={imageUrl}
-        />
+        <Input label="Product name" onChange={(event) => setTitle(event.target.value)} value={title} />
+        <Input label="Product handle" onChange={(event) => setHandle(event.target.value)} value={handle} />
+        <Input label="Category" onChange={(event) => setCategory(event.target.value)} value={category} />
+        <Input icon={<Image size={18} aria-hidden="true" />} label="Image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />
         <Button fullWidth loading={busy} type="submit">
-          Save photo
+          Save product
         </Button>
       </form>
     </Card>
@@ -816,6 +914,7 @@ function CreateVariantCard({
     sku: "",
     title: "",
   });
+  const [price, setPrice] = useState("");
 
   function update<K extends keyof VariantDraft>(key: K, value: VariantDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -831,6 +930,7 @@ function CreateVariantCard({
       ...draft,
       barcode: draft.barcode?.trim() || undefined,
       brand: draft.brand?.trim() || undefined,
+      priceCents: dollarsToCents(price),
       sku: draft.sku.trim(),
       title: draft.title.trim(),
       vehicleId: draft.inventoryState === "ON_VEHICLE" ? draft.vehicleId : undefined,
@@ -842,6 +942,7 @@ function CreateVariantCard({
       sku: "",
       title: "",
     });
+    setPrice("");
   }
 
   return (
@@ -863,11 +964,13 @@ function CreateVariantCard({
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Input
-            label="Price cents"
+            label="Price"
             min={0}
-            onChange={(event) => update("priceCents", Number(event.target.value))}
+            onChange={(event) => setPrice(event.target.value)}
+            placeholder="24.99"
+            step="0.01"
             type="number"
-            value={draft.priceCents}
+            value={price}
           />
           <Input
             label="Quantity"
@@ -1028,6 +1131,106 @@ function VariantStockRow({
   );
 }
 
+function VariantContractCard({
+  busy,
+  variant,
+  vehicles,
+  onAssignVehicle,
+  onSetState,
+  onUpdateQuantity,
+  onUpdateVariantDetails,
+}: {
+  busy: boolean;
+  variant: InventoryVariant;
+  vehicles: DeliveryVehicle[];
+  onAssignVehicle: (variantId: string, vehicleId: string) => void;
+  onSetState: (variantId: string, state: InventoryState) => void;
+  onUpdateQuantity: (variantId: string, quantity: number) => void;
+  onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
+}) {
+  const [title, setTitle] = useState(variant.title);
+  const [sku, setSku] = useState(variant.sku);
+  const [brand, setBrand] = useState(variant.metadata.brand ?? "");
+  const [barcode, setBarcode] = useState(variant.metadata.barcode ?? "");
+  const [price, setPrice] = useState(centsToDollarsString(variant.priceCents));
+  const [quantity, setQuantity] = useState(variant.metadata.availableQuantity);
+  const [inventoryState, setInventoryState] = useState<InventoryState>(
+    variant.metadata.inventoryState,
+  );
+  const [vehicleId, setVehicleId] = useState(variant.metadata.assignedVehicleId ?? "");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextVehicleId = inventoryState === "ON_VEHICLE" ? vehicleId : undefined;
+
+    onUpdateVariantDetails(variant.id, {
+      barcode: barcode.trim() || undefined,
+      brand: brand.trim() || undefined,
+      inventoryState,
+      priceCents: dollarsToCents(price),
+      quantity,
+      sku: sku.trim(),
+      title: title.trim(),
+      vehicleId: nextVehicleId,
+    });
+    onUpdateQuantity(variant.id, quantity);
+    onSetState(variant.id, inventoryState);
+    onAssignVehicle(variant.id, nextVehicleId ?? "warehouse");
+  }
+
+  return (
+    <Card as="article" elevated>
+      <form className="grid gap-4" onSubmit={submit}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">
+              {variant.productTitle}
+            </p>
+            <h3 className="mt-1 truncate text-xl font-black text-[var(--bb-charcoal)]">
+              {variant.title}
+            </h3>
+          </div>
+          <StatusBadge
+            status={inventoryState === "ON_VEHICLE" ? "On vehicle" : "Warehouse"}
+            tone={inventoryState === "ON_VEHICLE" ? "brand" : "info"}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input label="Variant name" onChange={(event) => setTitle(event.target.value)} value={title} />
+          <Input label="SKU" onChange={(event) => setSku(event.target.value)} value={sku} />
+          <Input label="Brand" onChange={(event) => setBrand(event.target.value)} value={brand} />
+          <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
+          <Input label="Price" min={0} onChange={(event) => setPrice(event.target.value)} step="0.01" type="number" value={price} />
+          <Input label="Available quantity" min={0} onChange={(event) => setQuantity(Number(event.target.value))} type="number" value={quantity} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select label="Stock location" onChange={(event) => setInventoryState(event.target.value as InventoryState)} value={inventoryState}>
+            <option value="IN_WAREHOUSE">In warehouse</option>
+            <option value="ON_VEHICLE">On vehicle</option>
+          </Select>
+          {inventoryState === "ON_VEHICLE" ? (
+            <Select label="Delivery vehicle" onChange={(event) => setVehicleId(event.target.value)} value={vehicleId}>
+              <option value="">Choose vehicle</option>
+              {vehicles
+                .filter((vehicle) => vehicle.id !== "warehouse")
+                .map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.label}
+                  </option>
+                ))}
+            </Select>
+          ) : (
+            <Input disabled label="Delivery vehicle" value="Not assigned" />
+          )}
+        </div>
+        <Button fullWidth loading={busy} type="submit">
+          Save variant
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
 function AttentionItem({
   children,
   title,
@@ -1096,6 +1299,24 @@ function formatMoney(cents: number) {
     currency: "USD",
     style: "currency",
   }).format(cents / 100);
+}
+
+function centsToDollarsString(cents: number) {
+  if (!cents) {
+    return "";
+  }
+
+  return (cents / 100).toFixed(2);
+}
+
+function dollarsToCents(value: string) {
+  const dollars = Number(value);
+
+  if (!Number.isFinite(dollars) || dollars <= 0) {
+    return 0;
+  }
+
+  return Math.round(dollars * 100);
 }
 
 export default App;

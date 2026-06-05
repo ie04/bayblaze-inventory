@@ -67,6 +67,42 @@ POST /api/inventory
 
 POST /api/inventory
 { "type": "update-product-image", "productId": "...", "imageUrl": "https://..." }
+
+POST /api/inventory
+{
+  "type": "create-product-with-variant",
+  "draft": {
+    "title": "...",
+    "handle": "...",
+    "category": "...",
+    "imageUrl": "https://...",
+    "variant": {
+      "title": "...",
+      "sku": "...",
+      "brand": "...",
+      "barcode": "...",
+      "priceCents": 2499,
+      "quantity": 12,
+      "inventoryState": "ON_VEHICLE",
+      "vehicleId": "van-01"
+    }
+  }
+}
+
+POST /api/inventory
+{
+  "type": "update-variant-details",
+  "variantId": "...",
+  "draft": {
+    "title": "...",
+    "sku": "...",
+    "brand": "...",
+    "barcode": "...",
+    "priceCents": 2499,
+    "quantity": 12,
+    "inventoryState": "IN_WAREHOUSE"
+  }
+}
 ```
 
 The API should return:

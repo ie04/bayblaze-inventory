@@ -52,6 +52,11 @@ Every sellable unit must be represented at the Medusa variant level.
 Product images are managed on the Medusa product through `thumbnail` and
 `images`; do not require staff to leave the inventory app for routine product
 photo updates.
+The inventory Stock screen should remain the direct editor for human-friendly
+variant contract fields: variant name, SKU, brand, barcode, price, available
+quantity, stock location, and delivery vehicle. Avoid exposing raw variable
+names such as `inventoryState`, `availableQuantity`, or `assignedVehicleId` in
+primary UI labels.
 
 BayBlaze product variants must include metadata:
 

@@ -68,3 +68,11 @@ export type VariantDraft = {
   title: string;
   vehicleId?: string;
 };
+
+export type ProductWithVariantDraft = ProductDraft & {
+  variant: VariantDraft;
+};
+
+export type ProductUpdateDraft = Partial<ProductDraft>;
+
+export type VariantUpdateDraft = Partial<VariantDraft>;
