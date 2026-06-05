@@ -30,6 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const medusaResponse = await fetch(`${backendUrl}/admin/bayblaze/inventory`, {
     body: req.method === "POST" ? JSON.stringify(req.body ?? {}) : undefined,
     headers: {
+      Authorization: `Bearer ${serviceToken}`,
       "Content-Type": "application/json",
       "x-bayblaze-service-token": serviceToken,
     },
