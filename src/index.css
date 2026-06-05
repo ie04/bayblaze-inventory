@@ -1,0 +1,177 @@
+@import url("https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-bayblaze-blaze: var(--bb-blaze);
+  --color-bayblaze-charcoal: var(--bb-charcoal);
+  --color-bayblaze-muted: var(--bb-muted);
+  --color-bayblaze-line: var(--bb-line);
+  --color-bayblaze-surface: var(--bb-surface);
+  --color-bayblaze-warm: var(--bb-surface-warm);
+  --color-bayblaze-success: var(--bb-success);
+  --color-bayblaze-warning: var(--bb-warning);
+  --color-bayblaze-danger: var(--bb-danger);
+  --font-sans: "Jost", Arial, Helvetica, sans-serif;
+  --radius-bayblaze-control: var(--bb-radius-control);
+  --radius-bayblaze-card: var(--bb-radius-card);
+  --shadow-bayblaze-soft: var(--bb-shadow-soft);
+  --shadow-bayblaze-card: var(--bb-shadow-card);
+}
+
+:root {
+  --bb-blaze: #f26a1b;
+  --bb-blaze-strong: #c94d12;
+  --bb-blaze-soft: #fff0e6;
+  --bb-charcoal: #111111;
+  --bb-ink: #1d1d1b;
+  --bb-muted: #6d716b;
+  --bb-line: #e3e0da;
+  --bb-surface: #ffffff;
+  --bb-surface-warm: #f8f5ef;
+  --bb-neutral-soft: #f0f1ef;
+  --bb-success: #2f8f46;
+  --bb-success-strong: #1f6631;
+  --bb-success-soft: #e8f6ec;
+  --bb-warning: #d9961d;
+  --bb-warning-strong: #855b0e;
+  --bb-warning-soft: #fff5dc;
+  --bb-danger: #dc2626;
+  --bb-danger-strong: #991b1b;
+  --bb-danger-soft: #fee2e2;
+  --bb-info: #2563eb;
+  --bb-info-strong: #1d4ed8;
+  --bb-info-soft: #dbeafe;
+  --bb-focus: rgba(242, 106, 27, 0.42);
+  --bb-radius-control: 16px;
+  --bb-radius-card: 24px;
+  --bb-radius-shell: 28px;
+  --bb-shadow-soft: 0 1px 2px rgba(17, 17, 17, 0.06);
+  --bb-shadow-card: 0 16px 40px rgba(17, 17, 17, 0.08);
+  --bb-shadow-action: 0 14px 28px rgba(201, 77, 18, 0.18);
+  --bb-shadow-shell: 0 24px 80px rgba(17, 17, 17, 0.14);
+  --bayblaze-green: var(--bb-blaze);
+  --bayblaze-green-dark: var(--bb-charcoal);
+  --bayblaze-cream: var(--bb-surface-warm);
+  --bayblaze-ink: var(--bb-charcoal);
+  --bayblaze-muted: var(--bb-muted);
+  --bayblaze-line: var(--bb-line);
+  color: var(--bb-charcoal);
+  background: var(--bb-surface);
+  font-family: "Jost", Arial, Helvetica, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bb-surface-warm);
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: linear-gradient(
+    180deg,
+    var(--bb-surface) 0%,
+    var(--bb-surface-warm) 58%,
+    #eee9df 100%
+  );
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+.page-transition {
+  animation: page-enter 180ms cubic-bezier(0.2, 0.85, 0.25, 1) both;
+  transform-origin: 50% 24px;
+  will-change: opacity, transform;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
+}
+
+.confetti-burst,
+.confetti-burst::before,
+.confetti-burst::after {
+  position: absolute;
+  inset: 18% auto auto 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  animation: confetti-pop 900ms ease-out both;
+  box-shadow:
+    -120px 12px var(--bb-blaze),
+    -86px -42px var(--bb-danger),
+    -48px 28px var(--bb-warning),
+    -10px -70px var(--bb-info),
+    34px 18px var(--bb-success),
+    74px -38px var(--bb-danger),
+    116px 6px var(--bb-warning);
+  content: "";
+}
+
+.confetti-burst::before {
+  animation-delay: 90ms;
+  transform: rotate(24deg);
+}
+
+.confetti-burst::after {
+  animation-delay: 160ms;
+  transform: rotate(-18deg);
+}
+
+@keyframes confetti-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 36px) scale(0.4);
+  }
+
+  55% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(-50%, -42px) scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-burst,
+  .confetti-burst::before,
+  .confetti-burst::after {
+    animation: none;
+  }
+}
