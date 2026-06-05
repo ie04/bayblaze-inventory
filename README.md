@@ -13,26 +13,34 @@ npm run build
 npm run lint
 ```
 
-If `VITE_BAYBLAZE_INVENTORY_API_URL` is empty, the app uses in-memory demo data
-so UI work can continue without a live backend. Demo data is not persisted.
+For Vercel production, set `VITE_BAYBLAZE_INVENTORY_API_URL=/api` and provide
+server-only proxy variables:
+
+```env
+MEDUSA_BACKEND_URL=https://api.bayblaze.net
+BAYBLAZE_INVENTORY_SERVICE_TOKEN=
+```
+
+If the frontend API URL is empty, the app uses in-memory demo data so UI work
+can continue without a live backend. Demo data is not persisted.
 
 ## Inventory API Boundary
 
 Browser code should call a trusted inventory API boundary. Do not expose Medusa
-admin tokens in Vite environment variables.
+admin tokens or BayBlaze service tokens in Vite environment variables.
 
 Current frontend adapter shape:
 
 ```ts
-GET /inventory
+GET /api/inventory
 
-POST /inventory
+POST /api/inventory
 {
   "type": "create-product",
   "draft": { "title": "...", "handle": "...", "category": "..." }
 }
 
-POST /inventory
+POST /api/inventory
 {
   "type": "create-variant",
   "productId": "...",
@@ -48,13 +56,13 @@ POST /inventory
   }
 }
 
-POST /inventory
+POST /api/inventory
 { "type": "update-quantity", "variantId": "...", "quantity": 12 }
 
-POST /inventory
+POST /api/inventory
 { "type": "assign-vehicle", "variantId": "...", "vehicleId": "van-01" }
 
-POST /inventory
+POST /api/inventory
 { "type": "set-state", "variantId": "...", "state": "ON_VEHICLE" }
 ```
 

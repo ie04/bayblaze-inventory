@@ -33,8 +33,16 @@ creating new primitives.
 - The inventory PWA must not become a separate commerce database.
 - Browser code must not expose Medusa admin tokens or service tokens.
 - The PWA calls a same-origin or configured inventory API boundary through
-  `VITE_BAYBLAZE_INVENTORY_API_URL`. That backend boundary is responsible for
-  authenticating staff users and writing to Medusa.
+  `VITE_BAYBLAZE_INVENTORY_API_URL`. In Vercel production this should normally
+  be `/api`, which routes to `api/inventory.ts`. That backend boundary is
+  responsible for authenticating staff users and writing to Medusa.
+- Vercel server-only inventory proxy variables are `MEDUSA_BACKEND_URL` and
+  `BAYBLAZE_INVENTORY_SERVICE_TOKEN`. Do not prefix these with `VITE_`.
+- Production Vercel settings should use:
+  `VITE_BAYBLAZE_INVENTORY_API_URL=/api`,
+  `MEDUSA_BACKEND_URL=https://api.bayblaze.net`, and
+  `BAYBLAZE_INVENTORY_SERVICE_TOKEN=<same value Medusa accepts as
+  x-bayblaze-service-token>`.
 - When the inventory API is not configured or unavailable, the app falls back to
   demo data for local UX work. Demo mutations are in-memory only.
 
