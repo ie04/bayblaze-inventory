@@ -32,24 +32,15 @@ export async function loadInventory(): Promise<InventorySnapshot> {
     return waitForDemo(demoSnapshot);
   }
 
-  try {
-    return await request<InventorySnapshot>("/inventory");
-  } catch (caught) {
-    console.warn("Using demo inventory data because the inventory API is unavailable.", caught);
-    return waitForDemo(demoSnapshot);
-  }
+  return request<InventorySnapshot>("/inventory");
 }
 
 export async function mutateInventory(mutation: InventoryMutation): Promise<InventorySnapshot> {
   if (apiBaseUrl) {
-    try {
-      return await request<InventorySnapshot>("/inventory", {
-        body: JSON.stringify(mutation),
-        method: "POST",
-      });
-    } catch (caught) {
-      console.warn("Applying inventory mutation to demo data because the inventory API is unavailable.", caught);
-    }
+    return request<InventorySnapshot>("/inventory", {
+      body: JSON.stringify(mutation),
+      method: "POST",
+    });
   }
 
   demoSnapshot = applyDemoMutation(demoSnapshot, mutation);
@@ -97,10 +88,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Inventory API request failed with HTTP ${response.status}`);
+    throw new Error(`Inventory API request failed with HTTP ${response.status}: ${await readErrorMessage(response)}`);
   }
 
   return response.json() as Promise<T>;
+}
+
+async function readErrorMessage(response: Response) {
+  const fallback = response.statusText || "No response details returned.";
+
+  try {
+    const body = (await response.json()) as { message?: unknown };
+    return typeof body.message === "string" && body.message.trim() ? body.message.trim() : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutation): InventorySnapshot {

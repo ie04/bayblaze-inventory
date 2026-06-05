@@ -30,7 +30,9 @@ are server-only Vercel variables used by `/api/inventory` to merge active driver
 vehicles from Firestore `vehicles`.
 
 If the frontend API URL is empty, the app uses in-memory demo data so UI work
-can continue without a live backend. Demo data is not persisted.
+can continue without a live backend. Demo data is not persisted. When the API
+URL is configured, backend failures are shown as errors instead of silently
+falling back to demo data.
 
 ## Inventory API Boundary
 

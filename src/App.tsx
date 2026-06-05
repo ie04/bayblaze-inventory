@@ -219,6 +219,12 @@ function App() {
         <section className="min-h-0 flex-1 overflow-y-auto px-5 py-5 md:px-7">
           <div className="page-transition mx-auto flex min-h-0 w-full max-w-5xl flex-col gap-5">
             {error ? <ErrorState>{error}</ErrorState> : null}
+            {snapshot?.source === "demo" ? (
+              <InlineNotice tone="warning">
+                Demo mode is active because the app was built without an inventory API URL. Set
+                VITE_BAYBLAZE_INVENTORY_API_URL=/api in Vercel and redeploy to use Medusa inventory.
+              </InlineNotice>
+            ) : null}
             {loading && !snapshot ? <LoadingState label="Loading inventory" /> : activeScreen}
           </div>
         </section>

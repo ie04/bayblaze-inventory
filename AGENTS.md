@@ -50,8 +50,10 @@ creating new primitives.
   `BAYBLAZE_INVENTORY_SERVICE_TOKEN=<same value Medusa accepts as
   x-bayblaze-service-token>`. Add Firebase Admin server variables as above for
   vehicle dropdowns.
-- When the inventory API is not configured or unavailable, the app falls back to
-  demo data for local UX work. Demo mutations are in-memory only.
+- When the inventory API is not configured, the app falls back to demo data for
+  local UX work. Demo mutations are in-memory only. When the API URL is
+  configured, backend failures must surface as errors instead of silently using
+  demo data.
 
 ## Variant Metadata Contract
 
