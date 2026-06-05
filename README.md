@@ -64,6 +64,9 @@ POST /api/inventory
 
 POST /api/inventory
 { "type": "set-state", "variantId": "...", "state": "ON_VEHICLE" }
+
+POST /api/inventory
+{ "type": "update-product-image", "productId": "...", "imageUrl": "https://..." }
 ```
 
 The API should return:

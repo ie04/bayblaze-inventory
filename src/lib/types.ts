@@ -54,6 +54,7 @@ export type InventorySnapshot = {
 export type ProductDraft = {
   category: string;
   handle: string;
+  imageUrl?: string;
   title: string;
 };
 

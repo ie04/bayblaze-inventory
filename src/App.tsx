@@ -5,6 +5,7 @@ import {
   Boxes,
   CheckCircle2,
   ClipboardCheck,
+  Image,
   LayoutDashboard,
   PackagePlus,
   Plus,
@@ -112,6 +113,9 @@ function App() {
       onCreateProduct={(draft) => void applyMutation({ type: "create-product", draft })}
       onCreateVariant={(productId, draft) =>
         void applyMutation({ type: "create-variant", productId, draft })
+      }
+      onUpdateProductImage={(productId, imageUrl) =>
+        void applyMutation({ type: "update-product-image", productId, imageUrl })
       }
       onQueryChange={setQuery}
       onSetState={(variantId, state) => void applyMutation({ type: "set-state", variantId, state })}
@@ -222,6 +226,7 @@ function InventoryScreen({
   onAssignVehicle,
   onCreateProduct,
   onCreateVariant,
+  onUpdateProductImage,
   onQueryChange,
   onSetState,
   onUpdateQuantity,
@@ -237,6 +242,7 @@ function InventoryScreen({
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
   onCreateProduct: (draft: ProductDraft) => void;
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
+  onUpdateProductImage: (productId: string, imageUrl: string) => void;
   onQueryChange: (query: string) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
@@ -249,6 +255,7 @@ function InventoryScreen({
         vehicles={vehicles}
         onCreateProduct={onCreateProduct}
         onCreateVariant={onCreateVariant}
+        onUpdateProductImage={onUpdateProductImage}
       />
     );
   }
@@ -367,15 +374,18 @@ function ProductsView({
   vehicles,
   onCreateProduct,
   onCreateVariant,
+  onUpdateProductImage,
 }: {
   busy: boolean;
   products: InventoryProduct[];
   vehicles: DeliveryVehicle[];
   onCreateProduct: (draft: ProductDraft) => void;
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
+  onUpdateProductImage: (productId: string, imageUrl: string) => void;
 }) {
   const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? "");
   const effectiveSelectedProductId = selectedProductId || products[0]?.id || "";
+  const selectedProduct = products.find((product) => product.id === effectiveSelectedProductId);
 
   return (
     <>
@@ -398,6 +408,14 @@ function ProductsView({
         </div>
         <div className="space-y-5">
           <CreateProductCard busy={busy} onCreateProduct={onCreateProduct} />
+          {selectedProduct ? (
+            <ProductImageCard
+              busy={busy}
+              key={selectedProduct.id}
+              product={selectedProduct}
+              onUpdateProductImage={onUpdateProductImage}
+            />
+          ) : null}
           <CreateVariantCard
             busy={busy}
             productId={effectiveSelectedProductId}
@@ -624,7 +642,9 @@ function ProductCard({
     <button className="w-full text-left" onClick={onSelect} type="button">
       <Card className={selected ? "border-[var(--bb-blaze)]" : ""} interactive>
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-start gap-3">
+            <ProductThumbnail product={product} />
+            <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="truncate text-xl font-black text-[var(--bb-charcoal)]">{product.title}</h2>
               <StatusBadge status={product.status} tone={product.status === "published" ? "success" : "warning"} />
@@ -632,6 +652,7 @@ function ProductCard({
             <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
               {product.category} - /{product.handle}
             </p>
+            </div>
           </div>
           <Badge tone="brand">{units} units</Badge>
         </div>
@@ -660,6 +681,7 @@ function CreateProductCard({
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -671,10 +693,12 @@ function CreateProductCard({
       title: title.trim(),
       handle: handle.trim(),
       category: category.trim(),
+      imageUrl: imageUrl.trim() || undefined,
     });
     setTitle("");
     setHandle("");
     setCategory("");
+    setImageUrl("");
   }
 
   return (
@@ -684,12 +708,89 @@ function CreateProductCard({
         <Input label="Product name" onChange={(event) => setTitle(event.target.value)} value={title} />
         <Input label="Handle" onChange={(event) => setHandle(event.target.value)} placeholder="raz-tn9000" value={handle} />
         <Input label="Category" onChange={(event) => setCategory(event.target.value)} placeholder="Vapes" value={category} />
+        <Input
+          icon={<Image size={18} aria-hidden="true" />}
+          label="Product image URL"
+          onChange={(event) => setImageUrl(event.target.value)}
+          placeholder="https://..."
+          type="url"
+          value={imageUrl}
+        />
         <Button fullWidth loading={busy} type="submit">
           <Plus size={18} aria-hidden="true" />
           Add product
         </Button>
       </form>
     </Card>
+  );
+}
+
+function ProductImageCard({
+  busy,
+  product,
+  onUpdateProductImage,
+}: {
+  busy: boolean;
+  product: InventoryProduct;
+  onUpdateProductImage: (productId: string, imageUrl: string) => void;
+}) {
+  const [imageUrl, setImageUrl] = useState(product.thumbnail ?? "");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextImageUrl = imageUrl.trim();
+
+    if (!nextImageUrl) {
+      return;
+    }
+
+    onUpdateProductImage(product.id, nextImageUrl);
+  }
+
+  return (
+    <Card>
+      <SectionHeader title="Product photo" subtitle={product.title} />
+      <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
+        {imageUrl.trim() ? (
+          <img
+            alt=""
+            className="aspect-[4/3] w-full object-cover"
+            src={imageUrl.trim()}
+          />
+        ) : (
+          <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
+            <Image size={32} aria-hidden="true" />
+          </div>
+        )}
+      </div>
+      <form className="mt-4 space-y-3" onSubmit={submit}>
+        <Input
+          icon={<Image size={18} aria-hidden="true" />}
+          label="Image URL"
+          onChange={(event) => setImageUrl(event.target.value)}
+          placeholder="https://..."
+          type="url"
+          value={imageUrl}
+        />
+        <Button fullWidth loading={busy} type="submit">
+          Save photo
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+function ProductThumbnail({ product }: { product: InventoryProduct }) {
+  return (
+    <span className="grid size-16 shrink-0 overflow-hidden rounded-2xl bg-[var(--bb-surface-warm)] text-[var(--bb-muted)]">
+      {product.thumbnail ? (
+        <img alt="" className="size-full object-cover" src={product.thumbnail} />
+      ) : (
+        <span className="grid place-items-center">
+          <Image size={22} aria-hidden="true" />
+        </span>
+      )}
+    </span>
   );
 }
 

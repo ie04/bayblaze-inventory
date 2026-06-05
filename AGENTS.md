@@ -49,6 +49,9 @@ creating new primitives.
 ## Variant Metadata Contract
 
 Every sellable unit must be represented at the Medusa variant level.
+Product images are managed on the Medusa product through `thumbnail` and
+`images`; do not require staff to leave the inventory app for routine product
+photo updates.
 
 BayBlaze product variants must include metadata:
 

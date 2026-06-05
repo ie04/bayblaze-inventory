@@ -14,6 +14,7 @@ const apiBaseUrl = import.meta.env.VITE_BAYBLAZE_INVENTORY_API_URL?.toString().r
 type InventoryMutation =
   | { type: "create-product"; draft: ProductDraft }
   | { type: "create-variant"; productId: string; draft: VariantDraft }
+  | { type: "update-product-image"; productId: string; imageUrl: string }
   | { type: "update-quantity"; variantId: string; quantity: number }
   | { type: "assign-vehicle"; variantId: string; vehicleId: string }
   | { type: "set-state"; variantId: string; state: InventoryState };
@@ -107,8 +108,16 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
       handle: mutation.draft.handle,
       status: "draft",
       category: mutation.draft.category,
+      thumbnail: mutation.draft.imageUrl,
       variants: [],
     });
+  }
+
+  if (mutation.type === "update-product-image") {
+    const product = products.find((item) => item.id === mutation.productId);
+    if (product) {
+      product.thumbnail = mutation.imageUrl;
+    }
   }
 
   if (mutation.type === "create-variant") {
