@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Truck,
   Warehouse,
+  X,
 } from "lucide-react";
 
 import {
@@ -271,10 +272,14 @@ function InventoryScreen({
         busy={busy}
         products={products}
         vehicles={vehicles}
+        onAssignVehicle={onAssignVehicle}
         onCreateVariant={onCreateVariant}
         onOpenAddProduct={onOpenAddProduct}
+        onSetState={onSetState}
         onUpdateProductDetails={onUpdateProductDetails}
         onUpdateProductImage={onUpdateProductImage}
+        onUpdateQuantity={onUpdateQuantity}
+        onUpdateVariantDetails={onUpdateVariantDetails}
       />
     );
   }
@@ -402,22 +407,29 @@ function ProductsView({
   busy,
   products,
   vehicles,
+  onAssignVehicle,
   onCreateVariant,
   onOpenAddProduct,
+  onSetState,
   onUpdateProductDetails,
   onUpdateProductImage,
+  onUpdateQuantity,
+  onUpdateVariantDetails,
 }: {
   busy: boolean;
   products: InventoryProduct[];
   vehicles: DeliveryVehicle[];
+  onAssignVehicle: (variantId: string, vehicleId: string) => void;
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
   onOpenAddProduct: () => void;
+  onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductImage: (productId: string, imageUrl: string) => void;
+  onUpdateQuantity: (variantId: string, quantity: number) => void;
+  onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
-  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id ?? "");
-  const effectiveSelectedProductId = selectedProductId || products[0]?.id || "";
-  const selectedProduct = products.find((product) => product.id === effectiveSelectedProductId);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const editingProduct = products.find((product) => product.id === editingProductId);
 
   return (
     <>
@@ -433,44 +445,30 @@ function ProductsView({
           </Button>
         }
       />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-3">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              selected={effectiveSelectedProductId === product.id}
-              onSelect={() => setSelectedProductId(product.id)}
-            />
-          ))}
-        </div>
-        <div className="space-y-5">
-          <Card>
-            <SectionHeader title="Add product" subtitle="Use the guided mobile-friendly product flow." />
-            <Button className="mt-4" fullWidth onClick={onOpenAddProduct}>
-              <Plus size={18} aria-hidden="true" />
-              Start product flow
-            </Button>
-          </Card>
-          {selectedProduct ? (
-            <ProductDetailsCard
-              busy={busy}
-              key={selectedProduct.id}
-              product={selectedProduct}
-              onUpdateProductDetails={onUpdateProductDetails}
-              onUpdateProductImage={onUpdateProductImage}
-            />
-          ) : null}
-          <CreateVariantCard
-            busy={busy}
-            productId={effectiveSelectedProductId}
-            products={products}
-            vehicles={vehicles}
-            onCreateVariant={onCreateVariant}
-            onProductChange={setSelectedProductId}
+      <div className="grid gap-3 md:grid-cols-2">
+        {products.map((product) => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            onSelect={() => setEditingProductId(product.id)}
           />
-        </div>
+        ))}
       </div>
+      {editingProduct ? (
+        <ProductEditorDialog
+          busy={busy}
+          product={editingProduct}
+          vehicles={vehicles}
+          onAssignVehicle={onAssignVehicle}
+          onClose={() => setEditingProductId(null)}
+          onCreateVariant={onCreateVariant}
+          onSetState={onSetState}
+          onUpdateProductDetails={onUpdateProductDetails}
+          onUpdateProductImage={onUpdateProductImage}
+          onUpdateQuantity={onUpdateQuantity}
+          onUpdateVariantDetails={onUpdateVariantDetails}
+        />
+      ) : null}
     </>
   );
 }
@@ -676,18 +674,16 @@ function ContractView({ issues, products }: { issues: ContractIssue[]; products:
 
 function ProductCard({
   product,
-  selected,
   onSelect,
 }: {
   product: InventoryProduct;
-  selected: boolean;
   onSelect: () => void;
 }) {
   const units = product.variants.reduce((sum, variant) => sum + variant.metadata.availableQuantity, 0);
 
   return (
     <button className="w-full text-left" onClick={onSelect} type="button">
-      <Card className={selected ? "border-[var(--bb-blaze)]" : ""} interactive>
+      <Card interactive>
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
             <ProductThumbnail product={product} />
@@ -715,6 +711,99 @@ function ProductCard({
         </div>
       </Card>
     </button>
+  );
+}
+
+function ProductEditorDialog({
+  busy,
+  product,
+  vehicles,
+  onAssignVehicle,
+  onClose,
+  onCreateVariant,
+  onSetState,
+  onUpdateProductDetails,
+  onUpdateProductImage,
+  onUpdateQuantity,
+  onUpdateVariantDetails,
+}: {
+  busy: boolean;
+  product: InventoryProduct;
+  vehicles: DeliveryVehicle[];
+  onAssignVehicle: (variantId: string, vehicleId: string) => void;
+  onClose: () => void;
+  onCreateVariant: (productId: string, draft: VariantDraft) => void;
+  onSetState: (variantId: string, state: InventoryState) => void;
+  onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onUpdateProductImage: (productId: string, imageUrl: string) => void;
+  onUpdateQuantity: (variantId: string, quantity: number) => void;
+  onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/45 p-3 md:p-6" role="dialog" aria-modal="true">
+      <div className="mx-auto flex max-h-[calc(100svh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[var(--bb-radius-shell)] bg-white shadow-[var(--bb-shadow-shell)] md:max-h-[calc(100svh-3rem)]">
+        <header className="flex items-start justify-between gap-3 border-b border-[var(--bb-line)] px-5 py-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <ProductThumbnail product={product} />
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">
+                Product editor
+              </p>
+              <h2 className="truncate text-2xl font-black text-[var(--bb-charcoal)]">
+                {product.title}
+              </h2>
+              <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                {product.variants.length} variant{product.variants.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          </div>
+          <Button aria-label="Close product editor" onClick={onClose} size="icon" title="Close product editor" variant="secondary">
+            <X size={18} aria-hidden="true" />
+          </Button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="space-y-5">
+              <ProductDetailsCard
+                busy={busy}
+                product={product}
+                onUpdateProductDetails={onUpdateProductDetails}
+                onUpdateProductImage={onUpdateProductImage}
+              />
+              <CreateVariantCard
+                busy={busy}
+                productId={product.id}
+                products={[product]}
+                vehicles={vehicles}
+                onCreateVariant={onCreateVariant}
+                onProductChange={() => undefined}
+              />
+            </div>
+            <div className="space-y-3">
+              <SectionHeader title="Variants" subtitle="Edit sellable units and contract data." />
+              {product.variants.length === 0 ? (
+                <EmptyState title="No variants yet">
+                  Add the first sellable variant for this product.
+                </EmptyState>
+              ) : (
+                product.variants.map((variant) => (
+                  <VariantContractCard
+                    busy={busy}
+                    key={`${variant.id}-${variant.updatedAt}-${variant.metadata.availableQuantity}`}
+                    variant={variant}
+                    vehicles={vehicles}
+                    onAssignVehicle={onAssignVehicle}
+                    onSetState={onSetState}
+                    onUpdateQuantity={onUpdateQuantity}
+                    onUpdateVariantDetails={onUpdateVariantDetails}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
