@@ -844,10 +844,23 @@ function ProductDetailsCard({
   const [newCategory, setNewCategory] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUrl, setImageUrl] = useState(product.thumbnail ?? "");
+  const addCategoryOptionValue = "__add_category__";
   const visibleCategoryOptions =
     category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
 
-  function useNewCategory() {
+  function selectCategory(nextCategory: string) {
+    if (nextCategory === addCategoryOptionValue) {
+      setIsAddingCategory(true);
+      setNewCategory("");
+      return;
+    }
+
+    setCategory(nextCategory);
+    setIsAddingCategory(false);
+    setNewCategory("");
+  }
+
+  function saveNewCategory() {
     const nextCategory = newCategory.trim();
 
     if (!nextCategory) {
@@ -888,36 +901,45 @@ function ProductDetailsCard({
         <Input label="Product name" onChange={(event) => setTitle(event.target.value)} value={title} />
         <Input label="Product handle" onChange={(event) => setHandle(event.target.value)} value={handle} />
         <div className="space-y-2">
-          <Select label="Category" onChange={(event) => setCategory(event.target.value)} value={category}>
+          <Select
+            label="Category"
+            onChange={(event) => selectCategory(event.target.value)}
+            value={isAddingCategory ? addCategoryOptionValue : category}
+          >
             <option value="">Choose category</option>
             {visibleCategoryOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
+            <option value={addCategoryOptionValue}>+ Add Category</option>
           </Select>
-          <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-            <Button
-              onClick={() => setIsAddingCategory((current) => !current)}
-              type="button"
-              variant="secondary"
-            >
-              {isAddingCategory ? "Cancel" : "Add category"}
-            </Button>
-            {isAddingCategory ? (
-              <>
-                <Input
-                  label="New category"
-                  onChange={(event) => setNewCategory(event.target.value)}
-                  placeholder="Accessories"
-                  value={newCategory}
-                />
-                <Button onClick={useNewCategory} type="button">
-                  Use category
-                </Button>
-              </>
-            ) : null}
-          </div>
+          {isAddingCategory ? (
+            <div className="rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3">
+              <input
+                aria-label="New category name"
+                className="h-11 w-full rounded-full border border-[var(--bb-line)] bg-white px-4 text-sm font-bold text-[var(--bb-charcoal)] outline-none transition placeholder:text-[var(--bb-muted)] focus:border-[var(--bb-blaze)] focus:ring-4 focus:ring-[var(--bb-blaze-soft)]"
+                onChange={(event) => setNewCategory(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    saveNewCategory();
+                  }
+                }}
+                placeholder="New category name"
+                value={newCategory}
+              />
+              <Button
+                className="mt-2 rounded-full"
+                disabled={!newCategory.trim()}
+                onClick={saveNewCategory}
+                size="sm"
+                type="button"
+              >
+                Save category
+              </Button>
+            </div>
+          ) : null}
         </div>
         <Input icon={<Image size={18} aria-hidden="true" />} label="Image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />
         <Button fullWidth loading={busy} type="submit">
