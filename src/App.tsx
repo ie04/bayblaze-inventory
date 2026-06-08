@@ -437,6 +437,7 @@ function ProductsView({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const editingProduct = products.find((product) => product.id === editingProductId);
   const groupedProducts = useMemo(() => groupProductsByCategory(products), [products]);
+  const categoryOptions = useMemo(() => getCategoryOptions(products), [products]);
 
   return (
     <>
@@ -483,6 +484,7 @@ function ProductsView({
         <ProductEditorDialog
           busy={busy}
           product={editingProduct}
+          categoryOptions={categoryOptions}
           vehicles={vehicles}
           onAssignVehicle={onAssignVehicle}
           onClose={() => setEditingProductId(null)}
@@ -836,6 +838,7 @@ function ProductCard({
 function ProductEditorDialog({
   busy,
   product,
+  categoryOptions,
   vehicles,
   onAssignVehicle,
   onClose,
@@ -848,6 +851,7 @@ function ProductEditorDialog({
 }: {
   busy: boolean;
   product: InventoryProduct;
+  categoryOptions: string[];
   vehicles: DeliveryVehicle[];
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
   onClose: () => void;
@@ -886,6 +890,7 @@ function ProductEditorDialog({
               <ProductDetailsCard
                 busy={busy}
                 product={product}
+                categoryOptions={categoryOptions}
                 onUpdateProductDetails={onUpdateProductDetails}
                 onUpdateProductImage={onUpdateProductImage}
               />
@@ -1088,18 +1093,36 @@ function StepHeading({
 function ProductDetailsCard({
   busy,
   product,
+  categoryOptions,
   onUpdateProductDetails,
   onUpdateProductImage,
 }: {
   busy: boolean;
   product: InventoryProduct;
+  categoryOptions: string[];
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductImage: (productId: string, imageUrl: string) => void;
 }) {
   const [title, setTitle] = useState(product.title);
   const [handle, setHandle] = useState(product.handle);
   const [category, setCategory] = useState(product.category);
+  const [newCategory, setNewCategory] = useState("");
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUrl, setImageUrl] = useState(product.thumbnail ?? "");
+  const visibleCategoryOptions =
+    category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
+
+  function useNewCategory() {
+    const nextCategory = newCategory.trim();
+
+    if (!nextCategory) {
+      return;
+    }
+
+    setCategory(nextCategory);
+    setNewCategory("");
+    setIsAddingCategory(false);
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1132,7 +1155,38 @@ function ProductDetailsCard({
       <form className="mt-4 space-y-3" onSubmit={submit}>
         <Input label="Product name" onChange={(event) => setTitle(event.target.value)} value={title} />
         <Input label="Product handle" onChange={(event) => setHandle(event.target.value)} value={handle} />
-        <Input label="Category" onChange={(event) => setCategory(event.target.value)} value={category} />
+        <div className="space-y-2">
+          <Select label="Category" onChange={(event) => setCategory(event.target.value)} value={category}>
+            <option value="">Choose category</option>
+            {visibleCategoryOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </Select>
+          <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+            <Button
+              onClick={() => setIsAddingCategory((current) => !current)}
+              type="button"
+              variant="secondary"
+            >
+              {isAddingCategory ? "Cancel" : "Add category"}
+            </Button>
+            {isAddingCategory ? (
+              <>
+                <Input
+                  label="New category"
+                  onChange={(event) => setNewCategory(event.target.value)}
+                  placeholder="Accessories"
+                  value={newCategory}
+                />
+                <Button onClick={useNewCategory} type="button">
+                  Use category
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
         <Input icon={<Image size={18} aria-hidden="true" />} label="Image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />
         <Button fullWidth loading={busy} type="submit">
           Save product
@@ -1552,6 +1606,16 @@ function groupProductsByCategory(products: InventoryProduct[]) {
 
       return groups;
     }, []);
+}
+
+function getCategoryOptions(products: InventoryProduct[]) {
+  return Array.from(
+    new Set(
+      products
+        .map((product) => product.category.trim())
+        .filter((category) => category.length > 0),
+    ),
+  ).sort((first, second) => first.localeCompare(second, undefined, { sensitivity: "base" }));
 }
 
 function flattenVariants(products: InventoryProduct[]) {
