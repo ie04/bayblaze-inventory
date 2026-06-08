@@ -6,8 +6,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Image,
-  LayoutDashboard,
-  PackagePlus,
+  Package,
   Plus,
   RefreshCw,
   Search,
@@ -51,17 +50,14 @@ import type {
 type View = "overview" | "products" | "add-product" | "stock" | "vehicles" | "contract";
 
 const views: Array<{ id: View; icon: ReactNode; label: string }> = [
-  { id: "overview", icon: <LayoutDashboard size={18} aria-hidden="true" />, label: "Overview" },
-  { id: "products", icon: <PackagePlus size={18} aria-hidden="true" />, label: "Products" },
+  { id: "products", icon: <Package size={18} aria-hidden="true" />, label: "Products" },
   { id: "add-product", icon: <Plus size={18} aria-hidden="true" />, label: "Add" },
-  { id: "stock", icon: <Barcode size={18} aria-hidden="true" />, label: "Stock" },
   { id: "vehicles", icon: <Truck size={18} aria-hidden="true" />, label: "Vehicles" },
-  { id: "contract", icon: <ClipboardCheck size={18} aria-hidden="true" />, label: "Contract" },
 ];
 
 function App() {
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
-  const [activeView, setActiveView] = useState<View>("overview");
+  const [activeView, setActiveView] = useState<View>("products");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -175,7 +171,7 @@ function App() {
       }
       footer={
         <footer className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--bb-line)] bg-white/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(17,24,39,0.08)] backdrop-blur md:hidden">
-          <nav className="grid grid-cols-6 gap-1" aria-label="Inventory navigation">
+          <nav className="grid grid-cols-3 gap-1" aria-label="Inventory navigation">
             {views.map((item) => (
               <button
                 key={item.id}
@@ -196,7 +192,7 @@ function App() {
         </footer>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[180px_minmax(0,1fr)]">
         <aside className="hidden border-r border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-4 md:block">
           <nav className="space-y-2" aria-label="Inventory sections">
             {views.map((item) => (
@@ -441,14 +437,15 @@ function ProductsView({
 }) {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const editingProduct = products.find((product) => product.id === editingProductId);
+  const groupedProducts = useMemo(() => groupProductsByCategory(products), [products]);
 
   return (
     <>
       <PageHeader
-        eyebrow="Catalog"
-        icon={<PackagePlus size={24} aria-hidden="true" />}
-        title="Products and variants"
-        subtitle="Create product shells, then define every sellable unit at the variant level."
+        eyebrow="Inventory"
+        icon={<Package size={24} aria-hidden="true" />}
+        title="Products"
+        subtitle="A simple scrollable product list sorted by category. Tap a product to edit its details, images, variants, and stock."
         actions={
           <Button onClick={onOpenAddProduct} size="sm">
             <Plus size={18} aria-hidden="true" />
@@ -456,15 +453,35 @@ function ProductsView({
           </Button>
         }
       />
-      <div className="grid gap-3 md:grid-cols-2">
-        {products.map((product) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            onSelect={() => setEditingProductId(product.id)}
-          />
-        ))}
-      </div>
+      {groupedProducts.length === 0 ? (
+        <EmptyState icon={<Package size={22} aria-hidden="true" />} title="No products yet">
+          Add your first product to start building the BayBlaze inventory.
+        </EmptyState>
+      ) : (
+        <div className="space-y-6">
+          {groupedProducts.map((group) => (
+            <section key={group.category} className="space-y-2">
+              <div className="sticky top-0 z-10 -mx-1 flex items-center justify-between gap-3 rounded-2xl bg-white/95 px-1 py-2 backdrop-blur">
+                <h3 className="text-sm font-black uppercase tracking-wide text-[var(--bb-blaze)]">
+                  {group.category}
+                </h3>
+                <Badge tone="neutral">
+                  {group.products.length} product{group.products.length === 1 ? "" : "s"}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {group.products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onSelect={() => setEditingProductId(product.id)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
       {editingProduct ? (
         <ProductEditorDialog
           busy={busy}
@@ -555,20 +572,29 @@ function VehiclesView({
   vehicles: DeliveryVehicle[];
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
 }) {
+  const connectedVehicles = vehicles.filter((vehicle) => vehicle.id !== "warehouse");
+
   return (
     <>
       <PageHeader
         eyebrow="Dispatch inventory"
         icon={<Truck size={24} aria-hidden="true" />}
-        title="Vehicle assignments"
-        subtitle="Move sellable variants onto vehicles without changing Medusa into a separate dispatch database."
+        title="Vehicles"
+        subtitle="See the stock assigned to each connected vehicle and move inventory onto a vehicle from the product catalog."
       />
-      <div className="grid gap-5 lg:grid-cols-2">
-        {vehicles
-          .filter((vehicle) => vehicle.id !== "warehouse")
-          .map((vehicle) => {
+      {connectedVehicles.length === 0 ? (
+        <EmptyState icon={<Truck size={22} aria-hidden="true" />} title="No connected vehicles">
+          Add vehicles in the driver system before assigning inventory to them.
+        </EmptyState>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {connectedVehicles.map((vehicle) => {
             const assigned = variants.filter(
               (variant) => variant.metadata.assignedVehicleId === vehicle.id,
+            );
+            const vehicleUnits = assigned.reduce(
+              (sum, variant) => sum + variant.metadata.availableQuantity,
+              0,
             );
 
             return (
@@ -581,48 +607,134 @@ function VehiclesView({
                     <h2 className="mt-1 text-xl font-black text-[var(--bb-charcoal)] md:text-2xl">
                       {vehicle.label}
                     </h2>
+                    <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                      {assigned.length} variant{assigned.length === 1 ? "" : "s"} · {vehicleUnits} units
+                    </p>
                   </div>
                   <StatusBadge status={vehicle.active ? "Active" : "Inactive"} tone={vehicle.active ? "success" : "neutral"} />
                 </div>
-                <div className="mt-4 space-y-3">
-                  {assigned.length === 0 ? (
-                    <InlineNotice tone="warning">No variants are assigned to this vehicle.</InlineNotice>
-                  ) : (
-                    assigned.map((variant) => (
-                      <div
-                        key={variant.id}
-                        className="grid gap-3 rounded-2xl bg-[var(--bb-surface-warm)] p-3 sm:flex sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">
-                            {variant.productTitle}
-                          </p>
-                          <p className="truncate text-xs font-bold text-[var(--bb-muted)]">
-                            {variant.title} - {variant.sku}
-                          </p>
+
+                <VehicleAssignmentControl
+                  variants={variants}
+                  vehicle={vehicle}
+                  vehicles={vehicles}
+                  onAssignVehicle={onAssignVehicle}
+                />
+
+                <div className="mt-5">
+                  <SectionHeader title="Current stock" subtitle="Inventory assigned to this vehicle." />
+                  <div className="mt-4 space-y-3">
+                    {assigned.length === 0 ? (
+                      <InlineNotice tone="warning">No variants are assigned to this vehicle.</InlineNotice>
+                    ) : (
+                      assigned.map((variant) => (
+                        <div
+                          key={variant.id}
+                          className="grid gap-3 rounded-2xl bg-[var(--bb-surface-warm)] p-3 sm:flex sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">
+                              {variant.productTitle}
+                            </p>
+                            <p className="truncate text-xs font-bold text-[var(--bb-muted)]">
+                              {variant.title} - {variant.sku}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-start">
+                            <Badge tone="brand">{variant.metadata.availableQuantity} units</Badge>
+                            <Button
+                              aria-label={`Move ${variant.title} to warehouse`}
+                              onClick={() => onAssignVehicle(variant.id, "warehouse")}
+                              size="icon"
+                              title="Move to warehouse"
+                              variant="secondary"
+                            >
+                              <Warehouse size={17} aria-hidden="true" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-start">
-                          <Badge tone="brand">{variant.metadata.availableQuantity}</Badge>
-                          <Button
-                            aria-label={`Move ${variant.title} to warehouse`}
-                            onClick={() => onAssignVehicle(variant.id, "warehouse")}
-                            size="icon"
-                            title="Move to warehouse"
-                            variant="secondary"
-                          >
-                            <Warehouse size={17} aria-hidden="true" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
               </Card>
             );
           })}
-      </div>
+        </div>
+      )}
     </>
   );
+}
+
+function VehicleAssignmentControl({
+  variants,
+  vehicle,
+  vehicles,
+  onAssignVehicle,
+}: {
+  variants: InventoryVariant[];
+  vehicle: DeliveryVehicle;
+  vehicles: DeliveryVehicle[];
+  onAssignVehicle: (variantId: string, vehicleId: string) => void;
+}) {
+  const [selectedVariantId, setSelectedVariantId] = useState("");
+  const assignableVariants = variants.filter(
+    (variant) =>
+      variant.metadata.assignedVehicleId !== vehicle.id &&
+      variant.metadata.availableQuantity > 0,
+  );
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedVariantId) {
+      return;
+    }
+
+    onAssignVehicle(selectedVariantId, vehicle.id);
+    setSelectedVariantId("");
+  }
+
+  if (assignableVariants.length === 0) {
+    return (
+      <InlineNotice tone="success">
+        Every in-stock variant is already assigned to this vehicle.
+      </InlineNotice>
+    );
+  }
+
+  return (
+    <form className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]" onSubmit={submit}>
+      <Select
+        label="Add inventory to this vehicle"
+        onChange={(event) => setSelectedVariantId(event.target.value)}
+        value={selectedVariantId}
+      >
+        <option value="">Choose product / variant</option>
+        {assignableVariants.map((variant) => (
+          <option key={variant.id} value={variant.id}>
+            {formatVehicleAssignmentLabel(variant, vehicles)}
+          </option>
+        ))}
+      </Select>
+      <Button className="self-end" disabled={!selectedVariantId} type="submit">
+        <Plus size={18} aria-hidden="true" />
+        Add to vehicle
+      </Button>
+    </form>
+  );
+}
+
+function formatVehicleAssignmentLabel(variant: InventoryVariant, vehicles: DeliveryVehicle[]) {
+  const currentVehicle = vehicles.find(
+    (vehicle) => vehicle.id === variant.metadata.assignedVehicleId,
+  );
+  const location =
+    variant.metadata.inventoryState === "ON_VEHICLE"
+      ? currentVehicle?.label ?? "Vehicle"
+      : "Warehouse";
+
+  return `${variant.productTitle} / ${variant.title} (${variant.metadata.availableQuantity} units · ${location})`;
 }
 
 function ContractView({ issues, products }: { issues: ContractIssue[]; products: InventoryProduct[] }) {
@@ -691,34 +803,37 @@ function ProductCard({
   onSelect: () => void;
 }) {
   const units = product.variants.reduce((sum, variant) => sum + variant.metadata.availableQuantity, 0);
+  const brand = product.variants.find((variant) => variant.metadata.brand)?.metadata.brand;
+  const cheapestVariant = product.variants.reduce<InventoryVariant | null>(
+    (lowest, variant) => (!lowest || variant.priceCents < lowest.priceCents ? variant : lowest),
+    null,
+  );
 
   return (
     <button className="w-full text-left" onClick={onSelect} type="button">
-      <Card interactive>
-        <div className="grid gap-3 sm:flex sm:items-start sm:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
-            <ProductThumbnail product={product} />
-            <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="max-w-full truncate text-lg font-black text-[var(--bb-charcoal)] md:text-xl">{product.title}</h2>
+      <Card interactive className="p-3 md:p-4">
+        <div className="flex items-center gap-3">
+          <ProductThumbnail product={product} />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h2 className="max-w-full truncate text-base font-black text-[var(--bb-charcoal)] md:text-lg">
+                {product.title}
+              </h2>
               <StatusBadge status={product.status} tone={product.status === "published" ? "success" : "warning"} />
             </div>
-            <p className="mt-1 break-words text-sm font-bold text-[var(--bb-muted)]">
-              {product.category} - /{product.handle}
+            <p className="mt-1 truncate text-sm font-bold text-[var(--bb-muted)]">
+              {brand ? `${brand} · ` : ""}
+              {product.variants.length} variant{product.variants.length === 1 ? "" : "s"}
+              {cheapestVariant ? ` · From ${formatMoney(cheapestVariant.priceCents)}` : " · No variants yet"}
             </p>
-            </div>
+            <p className="mt-1 truncate text-xs font-bold text-[var(--bb-muted)]">
+              /{product.handle}
+            </p>
           </div>
-          <Badge className="w-fit" tone="brand">{units} units</Badge>
-        </div>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {product.variants.map((variant) => (
-            <MetricCard
-              key={variant.id}
-              label={variant.sku}
-              value={`${variant.title} - ${variant.metadata.availableQuantity}`}
-            />
-          ))}
-          {product.variants.length === 0 ? <MetricCard label="Variants" value="None yet" /> : null}
+          <div className="grid shrink-0 justify-items-end gap-2">
+            <Badge tone={units > 0 ? "brand" : "warning"}>{units} units</Badge>
+            <span className="text-xs font-black uppercase text-[var(--bb-muted)]">Open</span>
+          </div>
         </div>
       </Card>
     </button>
@@ -869,31 +984,74 @@ function AddProductFlow({
     <>
       <PageHeader
         eyebrow="New item"
-        icon={<PackagePlus size={24} aria-hidden="true" />}
+        icon={<Plus size={24} aria-hidden="true" />}
         title="Add product"
-        subtitle="Create the product and its first sellable variant together."
+        subtitle="Follow the steps from product photo to first variant and stock placement."
       />
-      <form className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]" onSubmit={submit}>
+      <form className="space-y-5" onSubmit={submit}>
         <Card elevated>
-          <SectionHeader title="Product" subtitle="Storefront catalog details." />
-          <div className="mt-4 grid gap-3">
-            <Input label="Brand" onChange={(event) => setBrand(event.target.value)} placeholder="RAZ" value={brand} />
-            <Input label="Product name" onChange={(event) => setTitle(event.target.value)} placeholder="RAZ TN9000" value={title} />
-            <Input label="Product handle" onChange={(event) => setHandle(event.target.value)} placeholder="raz-tn9000" value={handle} />
-            <Input label="Category" onChange={(event) => setCategory(event.target.value)} placeholder="Vapes" value={category} />
-            <Input icon={<Image size={18} aria-hidden="true" />} label="Product image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />
+          <StepHeading
+            step="1"
+            title="Product image"
+            subtitle="Paste the product image URL first so you can visually confirm you are adding the right item."
+          />
+          <div className="mt-4 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
+              {imageUrl.trim() ? (
+                <img alt="" className="aspect-[4/3] w-full object-cover" src={imageUrl.trim()} />
+              ) : (
+                <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
+                  <Image size={32} aria-hidden="true" />
+                </div>
+              )}
+            </div>
+            <Input
+              icon={<Image size={18} aria-hidden="true" />}
+              label="Product image URL"
+              onChange={(event) => setImageUrl(event.target.value)}
+              placeholder="https://..."
+              type="url"
+              value={imageUrl}
+            />
           </div>
         </Card>
+
         <Card elevated>
-          <SectionHeader title="First variant" subtitle="Variant-level contract data." />
-          <div className="mt-4 grid gap-3">
+          <StepHeading
+            step="2"
+            title="Product identity"
+            subtitle="Enter the storefront-facing catalog details. Brand is stored on the first variant for BayBlaze filters."
+          />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Input label="Product name" onChange={(event) => setTitle(event.target.value)} placeholder="RAZ TN9000" value={title} />
+            <Input label="Brand" onChange={(event) => setBrand(event.target.value)} placeholder="RAZ" value={brand} />
+            <Input label="Category" onChange={(event) => setCategory(event.target.value)} placeholder="Vapes" value={category} />
+            <Input label="Product handle" onChange={(event) => setHandle(event.target.value)} placeholder="raz-tn9000" value={handle} />
+          </div>
+        </Card>
+
+        <Card elevated>
+          <StepHeading
+            step="3"
+            title="First variant"
+            subtitle="Every sellable unit must exist as a variant with SKU, barcode, price, and metadata."
+          />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Input label="Variant name" onChange={(event) => setVariantTitle(event.target.value)} placeholder="Blue Razz Ice" value={variantTitle} />
             <Input label="SKU" onChange={(event) => setSku(event.target.value)} placeholder="RAZ-TN9000-BRI" value={sku} />
             <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input label="Price" min={0} onChange={(event) => setPrice(event.target.value)} placeholder="24.99" step="0.01" type="number" value={price} />
-              <Input label="Available quantity" min={0} onChange={(event) => setAvailableQuantity(Number(event.target.value))} type="number" value={availableQuantity} />
-            </div>
+            <Input label="Price" min={0} onChange={(event) => setPrice(event.target.value)} placeholder="24.99" step="0.01" type="number" value={price} />
+          </div>
+        </Card>
+
+        <Card elevated>
+          <StepHeading
+            step="4"
+            title="Quantity and location"
+            subtitle="Set the available quantity and decide whether the first units start in the warehouse or on a delivery vehicle."
+          />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Input label="Available quantity" min={0} onChange={(event) => setAvailableQuantity(Number(event.target.value))} type="number" value={availableQuantity} />
             <Select label="Stock location" onChange={(event) => setInventoryState(event.target.value as InventoryState)} value={inventoryState}>
               <option value="IN_WAREHOUSE">In warehouse</option>
               <option value="ON_VEHICLE">On vehicle</option>
@@ -910,14 +1068,36 @@ function AddProductFlow({
                   ))}
               </Select>
             ) : null}
+          </div>
+          <div className="mt-5">
             <Button fullWidth loading={busy} type="submit">
               <Plus size={18} aria-hidden="true" />
-              Create product
+              Create product and first variant
             </Button>
           </div>
         </Card>
       </form>
     </>
+  );
+}
+
+function StepHeading({
+  step,
+  title,
+  subtitle,
+}: {
+  step: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <Badge tone="brand">Step {step}</Badge>
+      <div>
+        <h3 className="text-lg font-black text-[var(--bb-charcoal)]">{title}</h3>
+        <p className="mt-1 text-sm font-semibold leading-6 text-[var(--bb-muted)]">{subtitle}</p>
+      </div>
+    </div>
   );
 }
 
@@ -1358,6 +1538,36 @@ function MetadataRule({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-sm font-black text-[var(--bb-charcoal)]">{value}</p>
     </div>
   );
+}
+
+
+function groupProductsByCategory(products: InventoryProduct[]) {
+  return [...products]
+    .sort((first, second) => {
+      const categoryCompare = (first.category || "Uncategorized").localeCompare(
+        second.category || "Uncategorized",
+        undefined,
+        { sensitivity: "base" },
+      );
+
+      if (categoryCompare !== 0) {
+        return categoryCompare;
+      }
+
+      return first.title.localeCompare(second.title, undefined, { sensitivity: "base" });
+    })
+    .reduce<Array<{ category: string; products: InventoryProduct[] }>>((groups, product) => {
+      const category = product.category || "Uncategorized";
+      const currentGroup = groups.at(-1);
+
+      if (currentGroup?.category === category) {
+        currentGroup.products.push(product);
+      } else {
+        groups.push({ category, products: [product] });
+      }
+
+      return groups;
+    }, []);
 }
 
 function flattenVariants(products: InventoryProduct[]) {
