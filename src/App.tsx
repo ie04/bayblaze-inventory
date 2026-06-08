@@ -174,7 +174,7 @@ function App() {
         </header>
       }
       footer={
-        <footer className="border-t border-[var(--bb-line)] bg-white/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
+        <footer className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--bb-line)] bg-white/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_30px_rgba(17,24,39,0.08)] backdrop-blur md:hidden">
           <nav className="grid grid-cols-6 gap-1" aria-label="Inventory navigation">
             {views.map((item) => (
               <button
@@ -216,7 +216,7 @@ function App() {
             ))}
           </nav>
         </aside>
-        <section className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-7 md:py-5">
+        <section className="min-h-0 flex-1 overflow-y-auto px-3 pb-28 pt-4 md:px-7 md:py-5">
           <div className="page-transition mx-auto flex min-h-0 w-full max-w-5xl flex-col gap-4 md:gap-5">
             {error ? <ErrorState>{error}</ErrorState> : null}
             {snapshot?.source === "demo" ? (
