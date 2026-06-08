@@ -1135,9 +1135,6 @@ function ProductDetailsCard({
       title: title.trim(),
     });
 
-    if (nextImageUrl) {
-      onUpdateProductImage(product.id, nextImageUrl);
-    }
   }
 
   return (
