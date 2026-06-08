@@ -442,7 +442,6 @@ function ProductsView({
   return (
     <>
       <PageHeader
-        eyebrow="Inventory"
         icon={<Package size={24} aria-hidden="true" />}
         title="Products"
         subtitle="A simple scrollable product list sorted by category. Tap a product to edit its details, images, variants, and stock."
@@ -577,7 +576,6 @@ function VehiclesView({
   return (
     <>
       <PageHeader
-        eyebrow="Dispatch inventory"
         icon={<Truck size={24} aria-hidden="true" />}
         title="Vehicles"
         subtitle="See the stock assigned to each connected vehicle and move inventory onto a vehicle from the product catalog."
@@ -983,9 +981,8 @@ function AddProductFlow({
   return (
     <>
       <PageHeader
-        eyebrow="New item"
         icon={<Plus size={24} aria-hidden="true" />}
-        title="Add product"
+        title="Add a Product"
         subtitle="Follow the steps from product photo to first variant and stock placement."
       />
       <form className="space-y-5" onSubmit={submit}>
