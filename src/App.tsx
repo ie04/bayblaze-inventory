@@ -117,9 +117,6 @@ function App() {
         void applyMutation({ type: "create-variant", productId, draft })
       }
       onOpenAddProduct={() => setActiveView("add-product")}
-      onUpdateProductImage={(productId, imageUrl) =>
-        void applyMutation({ type: "update-product-image", productId, imageUrl })
-      }
       onUpdateProductDetails={(productId, draft) =>
         void applyMutation({ type: "update-product-details", productId, draft })
       }
@@ -248,7 +245,6 @@ function InventoryScreen({
   onCreateVariant,
   onOpenAddProduct,
   onUpdateProductDetails,
-  onUpdateProductImage,
   onUpdateVariantDetails,
   onQueryChange,
   onSetState,
@@ -267,7 +263,6 @@ function InventoryScreen({
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
   onOpenAddProduct: () => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
-  onUpdateProductImage: (productId: string, imageUrl: string) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
   onQueryChange: (query: string) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
@@ -418,7 +413,6 @@ function ProductsView({
   onOpenAddProduct,
   onSetState,
   onUpdateProductDetails,
-  onUpdateProductImage,
   onUpdateQuantity,
   onUpdateVariantDetails,
 }: {
@@ -430,7 +424,6 @@ function ProductsView({
   onOpenAddProduct: () => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
-  onUpdateProductImage: (productId: string, imageUrl: string) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
@@ -845,7 +838,6 @@ function ProductEditorDialog({
   onCreateVariant,
   onSetState,
   onUpdateProductDetails,
-  onUpdateProductImage,
   onUpdateQuantity,
   onUpdateVariantDetails,
 }: {
@@ -858,7 +850,6 @@ function ProductEditorDialog({
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
-  onUpdateProductImage: (productId: string, imageUrl: string) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
@@ -1095,13 +1086,11 @@ function ProductDetailsCard({
   product,
   categoryOptions,
   onUpdateProductDetails,
-  onUpdateProductImage,
 }: {
   busy: boolean;
   product: InventoryProduct;
   categoryOptions: string[];
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
-  onUpdateProductImage: (productId: string, imageUrl: string) => void;
 }) {
   const [title, setTitle] = useState(product.title);
   const [handle, setHandle] = useState(product.handle);
