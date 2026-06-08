@@ -100,3 +100,16 @@ npm run lint
   static host.
 - Server-only Medusa credentials belong in the backend/API boundary only.
 - Public browser config must use the `VITE_` prefix and must be safe to expose.
+
+## June 2026 Driver Vehicle Source Clarification
+
+- Vehicle dropdown/source data that comes from Firestore should read from the
+  `bayblaze-driver` Firebase project, not the `bayblaze-isochronos` project.
+  IsoChronos owns routing/cache/usage collections; the driver project owns
+  `vehicles`, `driver_profiles`, `driver_delivery_queues`, and live driver
+  location snapshots.
+- The inventory app may display and assign Medusa variant `assignedVehicleId`,
+  but it must not become the owner of driver queues, driver live locations, or
+  order delivery lifecycle status. Those remain driver/Medusa/IsoChronos
+  integration concerns.
+
