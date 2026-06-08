@@ -622,7 +622,7 @@ function VehiclesView({
                 />
 
                 <div className="mt-5">
-                  <SectionHeader title="Current stock" subtitle="Inventory assigned to this vehicle." />
+                  <SectionHeader title="Current stock" />
                   <div className="mt-4 space-y-3">
                     {assigned.length === 0 ? (
                       <InlineNotice tone="warning">No variants are assigned to this vehicle.</InlineNotice>
@@ -1084,18 +1084,15 @@ function AddProductFlow({
 function StepHeading({
   step,
   title,
-  subtitle,
 }: {
   step: string;
   title: string;
-  subtitle: string;
 }) {
   return (
     <div className="flex items-start gap-3">
       <Badge tone="brand">Step {step}</Badge>
       <div>
         <h3 className="text-lg font-black text-[var(--bb-charcoal)]">{title}</h3>
-        <p className="mt-1 text-sm font-semibold leading-6 text-[var(--bb-muted)]">{subtitle}</p>
       </div>
     </div>
   );
