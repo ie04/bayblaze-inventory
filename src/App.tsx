@@ -363,7 +363,6 @@ function OverviewView({
         eyebrow="Inventory command"
         icon={<Boxes size={24} aria-hidden="true" />}
         title="Stockroom control"
-        subtitle="Add products, keep variant metadata complete, and move inventory between the warehouse and delivery vehicles."
       />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard icon={<Boxes size={16} />} label="Sellable variants" value={stats.variantCount} />
@@ -444,7 +443,6 @@ function ProductsView({
       <PageHeader
         icon={<Package size={24} aria-hidden="true" />}
         title="Products"
-        subtitle="A simple scrollable product list sorted by category. Tap a product to edit its details, images, variants, and stock."
         actions={
           <Button onClick={onOpenAddProduct} size="sm">
             <Plus size={18} aria-hidden="true" />
@@ -527,7 +525,6 @@ function StockView({
         eyebrow="Scanner"
         icon={<Barcode size={24} aria-hidden="true" />}
         title="Stock updates"
-        subtitle="Search by product, SKU, barcode, brand, or flavor before changing quantity or location."
       />
       <Card>
         <Input
@@ -578,7 +575,6 @@ function VehiclesView({
       <PageHeader
         icon={<Truck size={24} aria-hidden="true" />}
         title="Vehicles"
-        subtitle="See the stock assigned to each connected vehicle and move inventory onto a vehicle from the product catalog."
       />
       {connectedVehicles.length === 0 ? (
         <EmptyState icon={<Truck size={22} aria-hidden="true" />} title="No connected vehicles">
@@ -744,7 +740,6 @@ function ContractView({ issues, products }: { issues: ContractIssue[]; products:
         eyebrow="Metadata"
         icon={<ClipboardCheck size={24} aria-hidden="true" />}
         title="Contract audit"
-        subtitle="Every sellable unit must have variant-level metadata that storefront, driver, and IsoChronos can trust."
       />
       <Card tone={issues.length ? "warm" : "default"} elevated>
         <div className="flex items-start gap-3">
@@ -983,14 +978,12 @@ function AddProductFlow({
       <PageHeader
         icon={<Plus size={24} aria-hidden="true" />}
         title="Add a Product"
-        subtitle="Follow the steps from product photo to first variant and stock placement."
       />
       <form className="space-y-5" onSubmit={submit}>
         <Card elevated>
           <StepHeading
             step="1"
             title="Product image"
-            subtitle="Paste the product image URL first so you can visually confirm you are adding the right item."
           />
           <div className="mt-4 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
             <div className="overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
@@ -1017,7 +1010,6 @@ function AddProductFlow({
           <StepHeading
             step="2"
             title="Product identity"
-            subtitle="Enter the storefront-facing catalog details. Brand is stored on the first variant for BayBlaze filters."
           />
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Input label="Product name" onChange={(event) => setTitle(event.target.value)} placeholder="RAZ TN9000" value={title} />
@@ -1031,7 +1023,6 @@ function AddProductFlow({
           <StepHeading
             step="3"
             title="First variant"
-            subtitle="Every sellable unit must exist as a variant with SKU, barcode, price, and metadata."
           />
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Input label="Variant name" onChange={(event) => setVariantTitle(event.target.value)} placeholder="Blue Razz Ice" value={variantTitle} />
@@ -1045,7 +1036,6 @@ function AddProductFlow({
           <StepHeading
             step="4"
             title="Quantity and location"
-            subtitle="Set the available quantity and decide whether the first units start in the warehouse or on a delivery vehicle."
           />
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Input label="Available quantity" min={0} onChange={(event) => setAvailableQuantity(Number(event.target.value))} type="number" value={availableQuantity} />
