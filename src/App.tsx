@@ -1,23 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
-  AlertTriangle,
-  Barcode,
-  Boxes,
-  CheckCircle2,
-  ClipboardCheck,
   Image,
   Package,
   Plus,
   RefreshCw,
-  Search,
-  ShieldCheck,
   Truck,
   Warehouse,
   X,
 } from "lucide-react";
 
 import {
-  ActionBar,
   AppShell,
   Badge,
   Button,
@@ -27,15 +19,13 @@ import {
   Input,
   InlineNotice,
   LoadingState,
-  MetricCard,
   PageHeader,
   Select,
   SectionHeader,
   StatusBadge,
 } from "./components/ui";
-import { auditContract, loadInventory, mutateInventory } from "./lib/inventoryApi";
+import { loadInventory, mutateInventory } from "./lib/inventoryApi";
 import type {
-  ContractIssue,
   DeliveryVehicle,
   InventoryProduct,
   InventorySnapshot,
@@ -47,7 +37,7 @@ import type {
   VariantUpdateDraft,
 } from "./lib/types";
 
-type View = "overview" | "products" | "add-product" | "stock" | "vehicles" | "contract";
+type View = "products" | "add-product" | "vehicles";
 
 const views: Array<{ id: View; icon: ReactNode; label: string }> = [
   { id: "products", icon: <Package size={18} aria-hidden="true" />, label: "Products" },
@@ -61,7 +51,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
 
   async function refreshInventory() {
     setError("");
@@ -93,21 +82,12 @@ function App() {
   }, []);
 
   const variants = useMemo(() => flattenVariants(snapshot?.products ?? []), [snapshot]);
-  const filteredVariants = useMemo(
-    () => variants.filter((variant) => matchesVariant(variant, query)),
-    [query, variants],
-  );
-  const issues = useMemo(() => auditContract(snapshot?.products ?? []), [snapshot]);
-  const stats = useMemo(() => getStats(variants, issues), [issues, variants]);
 
   const activeScreen = snapshot ? (
     <InventoryScreen
       busy={busy}
-      issues={issues}
       products={snapshot.products}
-      query={query}
-      stats={stats}
-      variants={filteredVariants}
+      variants={variants}
       vehicles={snapshot.vehicles}
       view={activeView}
       onCreateProductWithVariant={(draft) =>
@@ -123,7 +103,6 @@ function App() {
       onUpdateVariantDetails={(variantId, draft) =>
         void applyMutation({ type: "update-variant-details", variantId, draft })
       }
-      onQueryChange={setQuery}
       onSetState={(variantId, state) => void applyMutation({ type: "set-state", variantId, state })}
       onUpdateQuantity={(variantId, quantity) =>
         void applyMutation({ type: "update-quantity", variantId, quantity })
@@ -233,10 +212,7 @@ function App() {
 
 function InventoryScreen({
   busy,
-  issues,
   products,
-  query,
-  stats,
   variants,
   vehicles,
   view,
@@ -244,17 +220,13 @@ function InventoryScreen({
   onCreateProductWithVariant,
   onCreateVariant,
   onOpenAddProduct,
+  onSetState,
   onUpdateProductDetails,
   onUpdateVariantDetails,
-  onQueryChange,
-  onSetState,
   onUpdateQuantity,
 }: {
   busy: boolean;
-  issues: ContractIssue[];
   products: InventoryProduct[];
-  query: string;
-  stats: ReturnType<typeof getStats>;
   variants: InventoryVariant[];
   vehicles: DeliveryVehicle[];
   view: View;
@@ -262,30 +234,11 @@ function InventoryScreen({
   onCreateProductWithVariant: (draft: ProductWithVariantDraft) => void;
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
   onOpenAddProduct: () => void;
+  onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
-  onQueryChange: (query: string) => void;
-  onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
 }) {
-  if (view === "products") {
-    return (
-      <ProductsView
-        busy={busy}
-        products={products}
-        vehicles={vehicles}
-        onAssignVehicle={onAssignVehicle}
-        onCreateVariant={onCreateVariant}
-        onOpenAddProduct={onOpenAddProduct}
-        onSetState={onSetState}
-        onUpdateProductDetails={onUpdateProductDetails}
-        onUpdateProductImage={onUpdateProductImage}
-        onUpdateQuantity={onUpdateQuantity}
-        onUpdateVariantDetails={onUpdateVariantDetails}
-      />
-    );
-  }
-
   if (view === "add-product") {
     return (
       <AddProductFlow
@@ -296,113 +249,26 @@ function InventoryScreen({
     );
   }
 
-  if (view === "stock") {
-    return (
-      <StockView
-        busy={busy}
-        query={query}
-        variants={variants}
-        vehicles={vehicles}
-        onAssignVehicle={onAssignVehicle}
-        onQueryChange={onQueryChange}
-        onSetState={onSetState}
-        onUpdateVariantDetails={onUpdateVariantDetails}
-        onUpdateQuantity={onUpdateQuantity}
-      />
-    );
-  }
-
   if (view === "vehicles") {
     return <VehiclesView variants={variants} vehicles={vehicles} onAssignVehicle={onAssignVehicle} />;
   }
 
-  if (view === "contract") {
-    return <ContractView issues={issues} products={products} />;
-  }
-
   return (
-    <OverviewView
+    <ProductsView
       busy={busy}
-      issues={issues}
-      stats={stats}
-      variants={variants}
+      products={products}
       vehicles={vehicles}
       onAssignVehicle={onAssignVehicle}
+      onCreateVariant={onCreateVariant}
+      onOpenAddProduct={onOpenAddProduct}
+      onSetState={onSetState}
+      onUpdateProductDetails={onUpdateProductDetails}
       onUpdateQuantity={onUpdateQuantity}
+      onUpdateVariantDetails={onUpdateVariantDetails}
     />
   );
 }
 
-function OverviewView({
-  busy,
-  issues,
-  stats,
-  variants,
-  vehicles,
-  onAssignVehicle,
-  onUpdateQuantity,
-}: {
-  busy: boolean;
-  issues: ContractIssue[];
-  stats: ReturnType<typeof getStats>;
-  variants: InventoryVariant[];
-  vehicles: DeliveryVehicle[];
-  onAssignVehicle: (variantId: string, vehicleId: string) => void;
-  onUpdateQuantity: (variantId: string, quantity: number) => void;
-}) {
-  const lowStock = variants.filter((variant) => variant.metadata.availableQuantity <= 5);
-
-  return (
-    <>
-      <PageHeader
-        eyebrow="Inventory command"
-        icon={<Boxes size={24} aria-hidden="true" />}
-        title="Stockroom control"
-      />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard icon={<Boxes size={16} />} label="Sellable variants" value={stats.variantCount} />
-        <MetricCard icon={<Warehouse size={16} />} label="Warehouse units" value={stats.warehouseUnits} />
-        <MetricCard icon={<Truck size={16} />} label="Vehicle units" value={stats.vehicleUnits} />
-        <MetricCard icon={<ShieldCheck size={16} />} label="Contract issues" value={stats.issueCount} />
-      </div>
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card elevated>
-          <SectionHeader title="Fast stock moves" subtitle="Use this for routine count corrections." />
-          <div className="mt-4 space-y-3">
-            {variants.slice(0, 5).map((variant) => (
-              <VariantStockRow
-                busy={busy}
-                key={`${variant.id}-${variant.updatedAt}-${variant.metadata.availableQuantity}`}
-                variant={variant}
-                vehicles={vehicles}
-                onAssignVehicle={onAssignVehicle}
-                onUpdateQuantity={onUpdateQuantity}
-              />
-            ))}
-          </div>
-        </Card>
-        <Card className="p-3 md:p-5">
-          <SectionHeader title="Needs attention" subtitle="Low stock and metadata problems." />
-          <div className="mt-4 space-y-3">
-            {lowStock.length === 0 && issues.length === 0 ? (
-              <InlineNotice tone="success">All tracked variants look ready for storefront, driver, and routing workflows.</InlineNotice>
-            ) : null}
-            {lowStock.slice(0, 3).map((variant) => (
-              <AttentionItem key={variant.id} tone="warning" title={variant.title}>
-                {variant.productTitle} has {variant.metadata.availableQuantity} units available.
-              </AttentionItem>
-            ))}
-            {issues.slice(0, 3).map((issue) => (
-              <AttentionItem key={issue.id} tone={issue.severity} title={issue.variantTitle}>
-                {issue.message}
-              </AttentionItem>
-            ))}
-          </div>
-        </Card>
-      </div>
-    </>
-  );
-}
 
 function ProductsView({
   busy,
@@ -484,72 +350,10 @@ function ProductsView({
           onCreateVariant={onCreateVariant}
           onSetState={onSetState}
           onUpdateProductDetails={onUpdateProductDetails}
-          onUpdateProductImage={onUpdateProductImage}
           onUpdateQuantity={onUpdateQuantity}
           onUpdateVariantDetails={onUpdateVariantDetails}
         />
       ) : null}
-    </>
-  );
-}
-
-function StockView({
-  busy,
-  query,
-  variants,
-  vehicles,
-  onAssignVehicle,
-  onQueryChange,
-  onSetState,
-  onUpdateVariantDetails,
-  onUpdateQuantity,
-}: {
-  busy: boolean;
-  query: string;
-  variants: InventoryVariant[];
-  vehicles: DeliveryVehicle[];
-  onAssignVehicle: (variantId: string, vehicleId: string) => void;
-  onQueryChange: (query: string) => void;
-  onSetState: (variantId: string, state: InventoryState) => void;
-  onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
-  onUpdateQuantity: (variantId: string, quantity: number) => void;
-}) {
-  return (
-    <>
-      <PageHeader
-        eyebrow="Scanner"
-        icon={<Barcode size={24} aria-hidden="true" />}
-        title="Stock updates"
-      />
-      <Card>
-        <Input
-          icon={<Search size={18} aria-hidden="true" />}
-          label="Find variant"
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Scan or type barcode, SKU, brand, flavor..."
-          value={query}
-        />
-      </Card>
-      <div className="space-y-3">
-        {variants.length === 0 ? (
-          <EmptyState icon={<Barcode size={22} aria-hidden="true" />} title="No variants found">
-            Try another barcode, SKU, brand, or product name.
-          </EmptyState>
-        ) : (
-          variants.map((variant) => (
-            <VariantContractCard
-              busy={busy}
-              key={`${variant.id}-${variant.updatedAt}-${variant.metadata.availableQuantity}`}
-              variant={variant}
-              vehicles={vehicles}
-              onAssignVehicle={onAssignVehicle}
-              onSetState={onSetState}
-              onUpdateVariantDetails={onUpdateVariantDetails}
-              onUpdateQuantity={onUpdateQuantity}
-            />
-          ))
-        )}
-      </div>
     </>
   );
 }
@@ -726,63 +530,6 @@ function formatVehicleAssignmentLabel(variant: InventoryVariant, vehicles: Deliv
   return `${variant.productTitle} / ${variant.title} (${variant.metadata.availableQuantity} units · ${location})`;
 }
 
-function ContractView({ issues, products }: { issues: ContractIssue[]; products: InventoryProduct[] }) {
-  const variants = flattenVariants(products);
-
-  return (
-    <>
-      <PageHeader
-        eyebrow="Metadata"
-        icon={<ClipboardCheck size={24} aria-hidden="true" />}
-        title="Contract audit"
-      />
-      <Card tone={issues.length ? "warm" : "default"} elevated>
-        <div className="flex items-start gap-3">
-          <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-white text-[var(--bb-charcoal)] md:size-12">
-            {issues.length ? <AlertTriangle size={23} aria-hidden="true" /> : <CheckCircle2 size={23} aria-hidden="true" />}
-          </span>
-          <div>
-            <h2 className="text-xl font-black leading-tight text-[var(--bb-charcoal)] md:text-2xl">
-              {issues.length ? `${issues.length} contract checks need attention` : "Metadata contract is clean"}
-            </h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--bb-muted)]">
-              Required variant metadata: inventoryState, availableQuantity, assignedVehicleId for vehicle stock, barcode when available, and brand.
-            </p>
-          </div>
-        </div>
-      </Card>
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card>
-          <SectionHeader title="Audit results" subtitle={`${variants.length} variants checked`} />
-          <div className="mt-4 space-y-3">
-            {issues.length === 0 ? (
-              <EmptyState icon={<ShieldCheck size={22} aria-hidden="true" />} title="No issues found">
-                Product variants are ready for BayBlaze clients.
-              </EmptyState>
-            ) : (
-              issues.map((issue) => (
-                <AttentionItem key={issue.id} tone={issue.severity} title={issue.variantTitle}>
-                  {issue.productTitle}: {issue.message}
-                </AttentionItem>
-              ))
-            )}
-          </div>
-        </Card>
-        <Card>
-          <SectionHeader title="Variant metadata" subtitle="Current required fields" />
-          <div className="mt-4 space-y-3 text-sm font-semibold text-[var(--bb-muted)]">
-            <MetadataRule label="inventoryState" value="ON_VEHICLE or IN_WAREHOUSE" />
-            <MetadataRule label="availableQuantity" value="Integer >= 0" />
-            <MetadataRule label="assignedVehicleId" value="Required for ON_VEHICLE" />
-            <MetadataRule label="barcode" value="Recommended for scan speed" />
-            <MetadataRule label="brand" value="Recommended for filters and matching" />
-          </div>
-        </Card>
-      </div>
-    </>
-  );
-}
-
 function ProductCard({
   product,
   onSelect,
@@ -883,7 +630,6 @@ function ProductEditorDialog({
                 product={product}
                 categoryOptions={categoryOptions}
                 onUpdateProductDetails={onUpdateProductDetails}
-                onUpdateProductImage={onUpdateProductImage}
               />
               <CreateVariantCard
                 busy={busy}
@@ -895,7 +641,7 @@ function ProductEditorDialog({
               />
             </div>
             <div className="space-y-3">
-              <SectionHeader title="Variants" subtitle="Edit sellable units and contract data." />
+              <SectionHeader title="Variants" />
               {product.variants.length === 0 ? (
                 <EmptyState title="No variants yet">
                   Add the first sellable variant for this product.
@@ -1128,7 +874,7 @@ function ProductDetailsCard({
 
   return (
     <Card>
-      <SectionHeader title="Product details" subtitle="Edit catalog fields and photo." />
+      <SectionHeader title="Product details" />
       <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
         {imageUrl.trim() ? (
           <img alt="" className="aspect-[4/3] w-full object-cover" src={imageUrl.trim()} />
@@ -1251,7 +997,7 @@ function CreateVariantCard({
 
   return (
     <Card>
-      <SectionHeader title="Create variant" subtitle="Every sellable unit lives here." />
+      <SectionHeader title="Create variant" />
       <form className="mt-4 space-y-3" onSubmit={submit}>
         <Select label="Product" onChange={(event) => onProductChange(event.target.value)} value={productId}>
           {products.map((product) => (
@@ -1309,128 +1055,6 @@ function CreateVariantCard({
           Add variant
         </Button>
       </form>
-    </Card>
-  );
-}
-
-function VariantStockRow({
-  busy,
-  showStateControl = false,
-  variant,
-  vehicles,
-  onAssignVehicle,
-  onSetState,
-  onUpdateQuantity,
-}: {
-  busy: boolean;
-  showStateControl?: boolean;
-  variant: InventoryVariant;
-  vehicles: DeliveryVehicle[];
-  onAssignVehicle: (variantId: string, vehicleId: string) => void;
-  onSetState?: (variantId: string, state: InventoryState) => void;
-  onUpdateQuantity: (variantId: string, quantity: number) => void;
-}) {
-  const [quantity, setQuantity] = useState(variant.metadata.availableQuantity);
-
-  return (
-    <Card as="article" className="p-4">
-      <div className="grid gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-base font-black text-[var(--bb-charcoal)]">
-              {variant.productTitle}
-            </p>
-            <StatusBadge
-              status={variant.metadata.inventoryState === "ON_VEHICLE" ? "Vehicle" : "Warehouse"}
-              tone={variant.metadata.inventoryState === "ON_VEHICLE" ? "brand" : "info"}
-            />
-          </div>
-          <p className="mt-1 truncate text-sm font-bold text-[var(--bb-muted)]">
-            {variant.title} - {variant.sku}
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-3">
-            <MetricCard label="Barcode" value={variant.metadata.barcode ?? "Missing"} />
-            <MetricCard label="Brand" value={variant.metadata.brand ?? "Missing"} />
-            <MetricCard label="Price" value={formatMoney(variant.priceCents)} />
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Button
-              aria-label={`Decrease ${variant.title} quantity`}
-              disabled={busy || quantity <= 0}
-              onClick={() => setQuantity((current) => Math.max(0, current - 1))}
-              size="icon"
-              title="Decrease quantity"
-              variant="secondary"
-            >
-              -
-            </Button>
-            <Input
-              aria-label={`${variant.title} quantity`}
-              className="min-w-0 flex-1"
-              min={0}
-              onChange={(event) => setQuantity(Number(event.target.value))}
-              type="number"
-              value={quantity}
-            />
-            <Button
-              aria-label={`Increase ${variant.title} quantity`}
-              disabled={busy}
-              onClick={() => setQuantity((current) => current + 1)}
-              size="icon"
-              title="Increase quantity"
-              variant="secondary"
-            >
-              +
-            </Button>
-          </div>
-          <ActionBar>
-            <Button
-              disabled={busy || quantity === variant.metadata.availableQuantity}
-              fullWidth
-              onClick={() => onUpdateQuantity(variant.id, quantity)}
-              size="sm"
-            >
-              Save count
-            </Button>
-            <Select
-              aria-label={`Assign ${variant.title}`}
-              onChange={(event) => onAssignVehicle(variant.id, event.target.value)}
-              value={variant.metadata.assignedVehicleId ?? "warehouse"}
-            >
-              <option value="warehouse">Warehouse</option>
-              {vehicles
-                .filter((vehicle) => vehicle.id !== "warehouse")
-                .map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {vehicle.label}
-                  </option>
-                ))}
-            </Select>
-          </ActionBar>
-          {showStateControl && onSetState ? (
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                fullWidth
-                onClick={() => onSetState(variant.id, "IN_WAREHOUSE")}
-                size="sm"
-                variant={variant.metadata.inventoryState === "IN_WAREHOUSE" ? "primary" : "secondary"}
-              >
-                Warehouse
-              </Button>
-              <Button
-                fullWidth
-                onClick={() => onSetState(variant.id, "ON_VEHICLE")}
-                size="sm"
-                variant={variant.metadata.inventoryState === "ON_VEHICLE" ? "primary" : "secondary"}
-              >
-                Vehicle
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </div>
     </Card>
   );
 }
@@ -1535,36 +1159,6 @@ function VariantContractCard({
   );
 }
 
-function AttentionItem({
-  children,
-  title,
-  tone,
-}: {
-  children: ReactNode;
-  title: string;
-  tone: "danger" | "warning";
-}) {
-  return (
-    <div className="rounded-2xl border border-[var(--bb-line)] bg-white p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">{title}</p>
-        <StatusBadge status={tone === "danger" ? "Fix" : "Check"} tone={tone} />
-      </div>
-      <p className="mt-1 text-sm font-semibold leading-6 text-[var(--bb-muted)]">{children}</p>
-    </div>
-  );
-}
-
-function MetadataRule({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-[var(--bb-surface-warm)] p-3">
-      <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">{label}</p>
-      <p className="mt-1 text-sm font-black text-[var(--bb-charcoal)]">{value}</p>
-    </div>
-  );
-}
-
-
 function groupProductsByCategory(products: InventoryProduct[]) {
   return [...products]
     .sort((first, second) => {
@@ -1606,36 +1200,6 @@ function getCategoryOptions(products: InventoryProduct[]) {
 
 function flattenVariants(products: InventoryProduct[]) {
   return products.flatMap((product) => product.variants);
-}
-
-function matchesVariant(variant: InventoryVariant, query: string) {
-  const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) {
-    return true;
-  }
-
-  return [
-    variant.productTitle,
-    variant.title,
-    variant.sku,
-    variant.metadata.barcode,
-    variant.metadata.brand,
-  ]
-    .filter(Boolean)
-    .some((value) => value!.toLowerCase().includes(normalizedQuery));
-}
-
-function getStats(variants: InventoryVariant[], issues: ContractIssue[]) {
-  return {
-    issueCount: issues.length,
-    variantCount: variants.length,
-    vehicleUnits: variants
-      .filter((variant) => variant.metadata.inventoryState === "ON_VEHICLE")
-      .reduce((sum, variant) => sum + variant.metadata.availableQuantity, 0),
-    warehouseUnits: variants
-      .filter((variant) => variant.metadata.inventoryState === "IN_WAREHOUSE")
-      .reduce((sum, variant) => sum + variant.metadata.availableQuantity, 0),
-  };
 }
 
 function formatMoney(cents: number) {

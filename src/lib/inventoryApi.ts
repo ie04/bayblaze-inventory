@@ -1,11 +1,9 @@
 import { createDemoSnapshot } from "./demoInventory";
 import type {
-  ContractIssue,
   InventoryProduct,
   InventorySnapshot,
   InventoryState,
   InventoryVariant,
-  ProductDraft,
   ProductUpdateDraft,
   ProductWithVariantDraft,
   VariantDraft,
@@ -15,11 +13,9 @@ import type {
 const apiBaseUrl = import.meta.env.VITE_BAYBLAZE_INVENTORY_API_URL?.toString().replace(/\/$/, "");
 
 type InventoryMutation =
-  | { type: "create-product"; draft: ProductDraft }
   | { type: "create-product-with-variant"; draft: ProductWithVariantDraft }
   | { type: "create-variant"; productId: string; draft: VariantDraft }
   | { type: "update-product-details"; productId: string; draft: ProductUpdateDraft }
-  | { type: "update-product-image"; productId: string; imageUrl: string }
   | { type: "update-variant-details"; variantId: string; draft: VariantUpdateDraft }
   | { type: "update-quantity"; variantId: string; quantity: number }
   | { type: "assign-vehicle"; variantId: string; vehicleId: string }
@@ -45,37 +41,6 @@ export async function mutateInventory(mutation: InventoryMutation): Promise<Inve
 
   demoSnapshot = applyDemoMutation(demoSnapshot, mutation);
   return waitForDemo(demoSnapshot);
-}
-
-export function auditContract(products: InventoryProduct[]): ContractIssue[] {
-  return products.flatMap((product) =>
-    product.variants.flatMap((variant) => {
-      const issues: ContractIssue[] = [];
-      const metadata = variant.metadata;
-
-      if (!["ON_VEHICLE", "IN_WAREHOUSE"].includes(metadata.inventoryState)) {
-        issues.push(toIssue(product.title, variant, "Inventory state must be ON_VEHICLE or IN_WAREHOUSE.", "danger"));
-      }
-
-      if (!Number.isInteger(metadata.availableQuantity) || metadata.availableQuantity < 0) {
-        issues.push(toIssue(product.title, variant, "Available quantity must be an integer greater than or equal to 0.", "danger"));
-      }
-
-      if (metadata.inventoryState === "ON_VEHICLE" && !metadata.assignedVehicleId) {
-        issues.push(toIssue(product.title, variant, "Vehicle inventory must include assignedVehicleId.", "danger"));
-      }
-
-      if (!metadata.barcode) {
-        issues.push(toIssue(product.title, variant, "Barcode is missing; scan workflows will require manual lookup.", "warning"));
-      }
-
-      if (!metadata.brand) {
-        issues.push(toIssue(product.title, variant, "Brand metadata is missing; storefront filters may be incomplete.", "warning"));
-      }
-
-      return issues;
-    }),
-  );
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -109,7 +74,7 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
   const products = structuredClone(snapshot.products);
   const updatedAt = new Date().toISOString();
 
-  if (mutation.type === "create-product" || mutation.type === "create-product-with-variant") {
+  if (mutation.type === "create-product-with-variant") {
     const product: InventoryProduct = {
       id: crypto.randomUUID(),
       title: mutation.draft.title,
@@ -117,14 +82,28 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
       status: "draft",
       category: mutation.draft.category,
       thumbnail: mutation.draft.imageUrl,
-      variants: [],
+      variants: [toDemoVariant(
+        {
+          id: "",
+          title: mutation.draft.title,
+          handle: mutation.draft.handle,
+          status: "draft",
+          category: mutation.draft.category,
+          thumbnail: mutation.draft.imageUrl,
+          variants: [],
+        },
+        mutation.draft.variant,
+        updatedAt,
+      )],
     };
 
-    products.unshift(product);
+    product.variants = product.variants.map((variant) => ({
+      ...variant,
+      productId: product.id,
+      productTitle: product.title,
+    }));
 
-    if (mutation.type === "create-product-with-variant") {
-      product.variants.push(toDemoVariant(product, mutation.draft.variant, updatedAt));
-    }
+    products.unshift(product);
   }
 
   if (mutation.type === "update-product-details") {
@@ -141,12 +120,6 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
     }
   }
 
-  if (mutation.type === "update-product-image") {
-    const product = products.find((item) => item.id === mutation.productId);
-    if (product) {
-      product.thumbnail = mutation.imageUrl;
-    }
-  }
 
   if (mutation.type === "create-variant") {
     const product = products.find((item) => item.id === mutation.productId);
@@ -233,21 +206,6 @@ function findVariant(products: InventoryProduct[], variantId: string) {
   }
 
   return undefined;
-}
-
-function toIssue(
-  productTitle: string,
-  variant: InventoryVariant,
-  message: string,
-  severity: ContractIssue["severity"],
-): ContractIssue {
-  return {
-    id: `${variant.id}-${message}`,
-    productTitle,
-    variantTitle: variant.title,
-    message,
-    severity,
-  };
 }
 
 function waitForDemo(snapshot: InventorySnapshot) {
