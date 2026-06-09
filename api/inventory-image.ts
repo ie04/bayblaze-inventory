@@ -9,6 +9,14 @@ type VercelResponse = {
   setHeader: (name: string, value: string) => void;
 };
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "4mb",
+    },
+  },
+};
+
 const backendUrl = process.env.MEDUSA_BACKEND_URL?.replace(/\/$/, "");
 const serviceToken =
   process.env.BAYBLAZE_INVENTORY_SERVICE_TOKEN ||
@@ -48,13 +56,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const responseText = await medusaResponse.text();
-  let responseBody: unknown;
+  let responseBody: { message?: unknown } | Record<string, unknown>;
 
   try {
     responseBody = responseText ? JSON.parse(responseText) : {};
   } catch {
     responseBody = {
       message: responseText || "Medusa inventory image API returned a non-JSON response.",
+    };
+  }
+
+  if (!medusaResponse.ok && typeof responseBody.message !== "string") {
+    responseBody = {
+      ...responseBody,
+      message: `Medusa inventory image API failed with HTTP ${medusaResponse.status}.`,
     };
   }
 
