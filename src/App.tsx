@@ -706,7 +706,7 @@ function AddProductFlow({
   const [category, setCategory] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [imageUploads, setImageUploads] = useState<ProductImageUploadDraft[]>([]);
+  const [imageUploads, setImageUploads] = useState<Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }>>([]);
   const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
   const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
   const [dragPreview, setDragPreview] = useState<{ dataUrl: string; x: number; y: number } | null>(null);
@@ -771,7 +771,6 @@ function AddProductFlow({
 
     const maxOriginalBytes = 30 * 1024 * 1024;
     const maxPhotos = 6;
-    const nextUploads: ProductImageUploadDraft[] = [];
 
     if (imageUploads.length + files.length > maxPhotos) {
       setImageError(`Add up to ${maxPhotos} product photos.`);
@@ -791,15 +790,21 @@ function AddProductFlow({
         event.target.value = "";
         return;
       }
+    }
 
+    const nextUploads: Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }> = [];
+
+    for (const file of files) {
       try {
         const dataUrl = await compressImageFileToDataUrl(file);
-
-        nextUploads.push({
+        const imageUpload = {
           dataUrl,
           fileName: toCompressedImageFileName(file.name || "product-photo"),
           mimeType: "image/jpeg",
-        });
+          uploading: true,
+        };
+
+        nextUploads.push(imageUpload);
       } catch {
         setImageError("Unable to process one of those images. Try another photo.");
         event.target.value = "";
@@ -810,6 +815,36 @@ function AddProductFlow({
     setImageUploads((current) => [...current, ...nextUploads].slice(0, maxPhotos));
     setImageError("");
     event.target.value = "";
+
+    for (const imageUpload of nextUploads) {
+      try {
+        const uploadedUrl = await uploadProductImage(imageUpload);
+
+        setImageUploads((current) =>
+          current.map((item) =>
+            item === imageUpload
+              ? {
+                  ...item,
+                  uploadedUrl,
+                  uploading: false,
+                }
+              : item,
+          ),
+        );
+      } catch (caught) {
+        setImageUploads((current) =>
+          current.map((item) =>
+            item === imageUpload
+              ? {
+                  ...item,
+                  uploading: false,
+                }
+              : item,
+          ),
+        );
+        setImageError(caught instanceof Error ? caught.message : "Product image upload failed.");
+      }
+    }
   }
 
   function removeProductPhoto(indexToRemove: number) {
@@ -910,8 +945,10 @@ function AddProductFlow({
     setDragPreview(null);
   }
 
+  const photosAreReady = imageUploads.every((upload) => !upload.uploading && upload.uploadedUrl);
+
   const canContinue =
-    currentStep === 0 ||
+    (currentStep === 0 && photosAreReady) ||
     (currentStep === 1 &&
       Boolean(title.trim() && handle.trim() && (category.trim() || (isAddingCategory && newCategory.trim())))) ||
     (currentStep === 2 && Boolean(variantTitle.trim() && sku.trim())) ||
@@ -949,7 +986,7 @@ function AddProductFlow({
       title: title.trim(),
       handle: handle.trim(),
       category: category.trim(),
-      imageUploads: imageUploads.length ? imageUploads : undefined,
+      imageUrls: imageUploads.map((upload) => upload.uploadedUrl).filter((url): url is string => Boolean(url)),
       variant: {
         barcode: barcode.trim() || undefined,
         brand: brand.trim() || undefined,
@@ -1080,11 +1117,18 @@ function AddProductFlow({
                       >
                         Remove
                       </button>
-                      {index === 0 ? (
-                        <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-blaze)] shadow">
-                          Main
-                        </span>
-                      ) : null}
+                      <div className="pointer-events-none absolute bottom-2 left-2 flex flex-wrap gap-1">
+                        {index === 0 ? (
+                          <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-blaze)] shadow">
+                            Main
+                          </span>
+                        ) : null}
+                        {upload.uploading ? (
+                          <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-muted)] shadow">
+                            Uploading
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   );
                 })}
@@ -1322,6 +1366,41 @@ function AddProductFlow({
       </form>
     </>
   );
+}
+
+async function uploadProductImage(imageUpload: ProductImageUploadDraft) {
+  const response = await fetch("/api/inventory-image", {
+    body: JSON.stringify({ imageUpload }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const message = await readUploadErrorMessage(response);
+
+    throw new Error(`Product image upload failed with HTTP ${response.status}: ${message}`);
+  }
+
+  const body = (await response.json()) as { url?: unknown };
+
+  if (typeof body.url !== "string" || !body.url.trim()) {
+    throw new Error("Product image upload did not return a URL.");
+  }
+
+  return body.url.trim();
+}
+
+async function readUploadErrorMessage(response: Response) {
+  try {
+    const body = (await response.json()) as { message?: unknown };
+    return typeof body.message === "string" && body.message.trim()
+      ? body.message.trim()
+      : response.statusText || "No response details returned.";
+  } catch {
+    return response.statusText || "No response details returned.";
+  }
 }
 
 function compressImageFileToDataUrl(file: File) {

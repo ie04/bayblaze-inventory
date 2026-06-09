@@ -55,6 +55,7 @@ export type ProductDraft = {
   category: string;
   handle: string;
   imageUrl?: string;
+  imageUrls?: string[];
   imageUpload?: ProductImageUploadDraft;
   imageUploads?: ProductImageUploadDraft[];
   title: string;
