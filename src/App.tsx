@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import {
   Image,
   Package,
@@ -707,6 +707,7 @@ function AddProductFlow({
   const [newCategory, setNewCategory] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUploads, setImageUploads] = useState<Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }>>([]);
+  const uploadedImageUrlsRef = useRef<string[]>([]);
   const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
   const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
   const [dragPreview, setDragPreview] = useState<{ dataUrl: string; x: number; y: number } | null>(null);
@@ -732,6 +733,29 @@ function AddProductFlow({
   const isLastStep = currentStep === steps.length - 1;
   const activeVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
   const availableQuantityNumber = Number(availableQuantity || "0");
+
+  useEffect(() => {
+    uploadedImageUrlsRef.current = imageUploads
+      .map((upload) => upload.uploadedUrl)
+      .filter((url): url is string => Boolean(url));
+  }, [imageUploads]);
+
+  useEffect(() => {
+    function cleanupAbandonedUploads() {
+      const urls = uploadedImageUrlsRef.current;
+
+      if (urls.length) {
+        void deleteUploadedProductImages(urls);
+      }
+    }
+
+    window.addEventListener("pagehide", cleanupAbandonedUploads);
+
+    return () => {
+      window.removeEventListener("pagehide", cleanupAbandonedUploads);
+      cleanupAbandonedUploads();
+    };
+  }, []);
   const addCategoryOptionValue = "__add_category__";
   const visibleCategoryOptions =
     category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
@@ -848,6 +872,12 @@ function AddProductFlow({
   }
 
   function removeProductPhoto(indexToRemove: number) {
+    const uploadToRemove = imageUploads[indexToRemove];
+
+    if (uploadToRemove?.uploadedUrl) {
+      void deleteUploadedProductImage(uploadToRemove.uploadedUrl);
+    }
+
     setImageUploads((current) => current.filter((_, index) => index !== indexToRemove));
     setDraggedPhotoIndex(null);
     setDragOverPhotoIndex(null);
@@ -1400,6 +1430,31 @@ async function readUploadErrorMessage(response: Response) {
       : response.statusText || "No response details returned.";
   } catch {
     return response.statusText || "No response details returned.";
+  }
+}
+
+async function deleteUploadedProductImage(url: string) {
+  await deleteUploadedProductImages([url]);
+}
+
+async function deleteUploadedProductImages(urls: string[]) {
+  const uniqueUrls = Array.from(new Set(urls.filter(Boolean)));
+
+  if (!uniqueUrls.length) {
+    return;
+  }
+
+  try {
+    await fetch("/api/inventory-image", {
+      body: JSON.stringify({ urls: uniqueUrls }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      keepalive: true,
+      method: "DELETE",
+    });
+  } catch {
+    // Best-effort cleanup. Medusa also expires stale temporary images.
   }
 }
 
