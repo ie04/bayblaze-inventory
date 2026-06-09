@@ -742,7 +742,7 @@ function AddProductFlow({
   }, [imageUploads]);
 
   useEffect(() => {
-    function cleanupAbandonedUploads() {
+    return () => {
       const urls = uploadedImageUrlsRef.current;
 
       if (urls.length) {
@@ -750,13 +750,6 @@ function AddProductFlow({
           // Best-effort abandoned upload cleanup. Medusa also expires stale temporary images.
         });
       }
-    }
-
-    window.addEventListener("pagehide", cleanupAbandonedUploads);
-
-    return () => {
-      window.removeEventListener("pagehide", cleanupAbandonedUploads);
-      cleanupAbandonedUploads();
     };
   }, []);
   const addCategoryOptionValue = "__add_category__";
