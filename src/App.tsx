@@ -728,8 +728,15 @@ function AddProductFlow({
       return;
     }
 
-    const maxBytes = 8 * 1024 * 1024;
+    const maxOriginalBytes = 30 * 1024 * 1024;
+    const maxPhotos = 6;
     const nextUploads: ProductImageUploadDraft[] = [];
+
+    if (imageUploads.length + files.length > maxPhotos) {
+      setImageError(`Add up to ${maxPhotos} product photos.`);
+      event.target.value = "";
+      return;
+    }
 
     for (const file of files) {
       if (!file.type.startsWith("image/")) {
@@ -738,28 +745,28 @@ function AddProductFlow({
         return;
       }
 
-      if (file.size > maxBytes) {
-        setImageError("Choose images under 8 MB.");
+      if (file.size > maxOriginalBytes) {
+        setImageError("Choose images under 30 MB.");
         event.target.value = "";
         return;
       }
 
       try {
-        const dataUrl = await readFileAsDataUrl(file);
+        const dataUrl = await compressImageFileToDataUrl(file);
 
         nextUploads.push({
           dataUrl,
-          fileName: file.name || "product-photo",
-          mimeType: file.type || "image/jpeg",
+          fileName: toCompressedImageFileName(file.name || "product-photo"),
+          mimeType: "image/jpeg",
         });
       } catch {
-        setImageError("Unable to read one of those images. Try another photo.");
+        setImageError("Unable to process one of those images. Try another photo.");
         event.target.value = "";
         return;
       }
     }
 
-    setImageUploads((current) => [...current, ...nextUploads]);
+    setImageUploads((current) => [...current, ...nextUploads].slice(0, maxPhotos));
     setImageError("");
     event.target.value = "";
   }
@@ -882,7 +889,7 @@ function AddProductFlow({
               </div>
 
               <p className="text-sm font-bold text-[var(--bb-muted)]">
-                Add one or more product photos. The first photo becomes the main storefront image.
+                Add up to 6 product photos. The first photo becomes the main storefront image.
               </p>
 
               {imageError ? <InlineNotice tone="warning">{imageError}</InlineNotice> : null}
@@ -1052,24 +1059,46 @@ function AddProductFlow({
   );
 }
 
-function readFileAsDataUrl(file: File) {
+function compressImageFileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
+    const image = new window.Image();
+    const objectUrl = URL.createObjectURL(file);
 
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-      } else {
-        reject(new Error("Image file could not be read."));
+    image.addEventListener("load", () => {
+      URL.revokeObjectURL(objectUrl);
+
+      const maxDimension = 1200;
+      const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        reject(new Error("Unable to prepare product image."));
+        return;
       }
+
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(image, 0, 0, width, height);
+
+      resolve(canvas.toDataURL("image/jpeg", 0.72));
     });
 
-    reader.addEventListener("error", () => {
-      reject(reader.error ?? new Error("Image file could not be read."));
+    image.addEventListener("error", () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Unable to read product image."));
     });
 
-    reader.readAsDataURL(file);
+    image.src = objectUrl;
   });
+}
+
+function toCompressedImageFileName(fileName: string) {
+  const baseName = fileName.replace(/\.[a-zA-Z0-9]+$/, "") || "product-photo";
+
+  return `${baseName}.jpg`;
 }
 
 function StepHeading({
