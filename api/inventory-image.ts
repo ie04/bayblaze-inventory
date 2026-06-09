@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  if (req.method !== "POST") {
+  if (req.method !== "POST" && req.method !== "DELETE") {
     return res.status(405).json({ message: "Method not allowed." });
   }
 
@@ -37,13 +37,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         "Content-Type": "application/json",
         "x-bayblaze-service-token": serviceToken,
       },
-      method: "POST",
+      method: req.method,
     });
   } catch (caught) {
-    console.error("Medusa inventory image upload request failed.", caught);
+    console.error("Medusa inventory image request failed.", caught);
 
     return res.status(502).json({
-      message: "Medusa inventory image upload API could not be reached.",
+      message: "Medusa inventory image API could not be reached.",
     });
   }
 
@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     responseBody = responseText ? JSON.parse(responseText) : {};
   } catch {
     responseBody = {
-      message: responseText || "Medusa inventory image upload API returned a non-JSON response.",
+      message: responseText || "Medusa inventory image API returned a non-JSON response.",
     };
   }
 
