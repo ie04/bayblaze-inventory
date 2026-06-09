@@ -839,6 +839,14 @@ function AddProductFlow({
     setDragOverPhotoIndex(null);
   }
 
+  function updatePhotoTouchDrag(touch: React.Touch) {
+    updatePhotoPointerDrag(touch.clientX, touch.clientY);
+  }
+
+  function finishPhotoTouchDrag(touch: React.Touch) {
+    finishPhotoPointerDrag(touch.clientX, touch.clientY);
+  }
+
   const canContinue =
     currentStep === 0 ||
     (currentStep === 1 && Boolean(title.trim() && handle.trim() && category.trim())) ||
@@ -917,7 +925,7 @@ function AddProductFlow({
                   return (
                     <div
                       className={[
-                        "group relative overflow-hidden rounded-3xl border bg-[var(--bb-surface-warm)] transition",
+                        "group relative touch-none select-none overflow-hidden rounded-3xl border bg-[var(--bb-surface-warm)] transition",
                         isDragging
                           ? "scale-[0.98] border-[var(--bb-blaze)] opacity-70 shadow-lg"
                           : isDropTarget
@@ -957,17 +965,54 @@ function AddProductFlow({
                         setDragOverPhotoIndex(null);
                       }}
                       onPointerDown={(event) => {
-                        if (event.pointerType === "mouse" && event.button !== 0) {
+                        if (event.pointerType !== "mouse" || event.button !== 0) {
                           return;
                         }
 
                         startPhotoPointerDrag(index);
                       }}
                       onPointerMove={(event) => {
+                        if (event.pointerType !== "mouse") {
+                          return;
+                        }
+
                         updatePhotoPointerDrag(event.clientX, event.clientY);
                       }}
                       onPointerUp={(event) => {
+                        if (event.pointerType !== "mouse") {
+                          return;
+                        }
+
                         finishPhotoPointerDrag(event.clientX, event.clientY);
+                      }}
+                      onTouchCancel={() => {
+                        setDraggedPhotoIndex(null);
+                        setDragOverPhotoIndex(null);
+                      }}
+                      onTouchEnd={(event) => {
+                        const touch = event.changedTouches[0];
+
+                        if (!touch) {
+                          setDraggedPhotoIndex(null);
+                          setDragOverPhotoIndex(null);
+                          return;
+                        }
+
+                        finishPhotoTouchDrag(touch);
+                      }}
+                      onTouchMove={(event) => {
+                        const touch = event.touches[0];
+
+                        if (!touch) {
+                          return;
+                        }
+
+                        event.preventDefault();
+                        updatePhotoTouchDrag(touch);
+                      }}
+                      onTouchStart={(event) => {
+                        startPhotoPointerDrag(index);
+                        updatePhotoTouchDrag(event.touches[0]);
                       }}
                       role="button"
                       tabIndex={0}
@@ -978,11 +1023,6 @@ function AddProductFlow({
                         draggable={false}
                         src={upload.dataUrl}
                       />
-                      <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center justify-between gap-2">
-                        <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-muted)] shadow">
-                          Drag
-                        </span>
-                      </div>
                       <button
                         aria-label={`Remove ${upload.fileName}`}
                         className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
@@ -991,6 +1031,7 @@ function AddProductFlow({
                           removeProductPhoto(index);
                         }}
                         onPointerDown={(event) => event.stopPropagation()}
+                        onTouchStart={(event) => event.stopPropagation()}
                         type="button"
                       >
                         Remove
