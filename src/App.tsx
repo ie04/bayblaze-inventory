@@ -741,17 +741,6 @@ function AddProductFlow({
       .filter((url): url is string => Boolean(url));
   }, [imageUploads]);
 
-  useEffect(() => {
-    return () => {
-      const urls = uploadedImageUrlsRef.current;
-
-      if (urls.length) {
-        void deleteUploadedProductImages(urls).catch(() => {
-          // Best-effort abandoned upload cleanup. Medusa also expires stale temporary images.
-        });
-      }
-    };
-  }, []);
   const addCategoryOptionValue = "__add_category__";
   const visibleCategoryOptions =
     category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
