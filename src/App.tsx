@@ -700,6 +700,8 @@ function AddProductFlow({
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
   const [imageUploads, setImageUploads] = useState<ProductImageUploadDraft[]>([]);
+  const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
+  const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
   const [imageError, setImageError] = useState("");
   const [variantTitle, setVariantTitle] = useState("");
   const [sku, setSku] = useState("");
@@ -773,7 +775,68 @@ function AddProductFlow({
 
   function removeProductPhoto(indexToRemove: number) {
     setImageUploads((current) => current.filter((_, index) => index !== indexToRemove));
+    setDraggedPhotoIndex(null);
+    setDragOverPhotoIndex(null);
     setImageError("");
+  }
+
+  function reorderProductPhoto(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) {
+      return;
+    }
+
+    setImageUploads((current) => {
+      if (fromIndex >= current.length || toIndex >= current.length) {
+        return current;
+      }
+
+      const nextUploads = [...current];
+      const [movedUpload] = nextUploads.splice(fromIndex, 1);
+      nextUploads.splice(toIndex, 0, movedUpload);
+
+      return nextUploads;
+    });
+  }
+
+  function getPhotoIndexFromPoint(clientX: number, clientY: number) {
+    const element = document.elementFromPoint(clientX, clientY);
+    const photoTile = element?.closest("[data-product-photo-index]");
+    const rawIndex = photoTile?.getAttribute("data-product-photo-index");
+    const index = Number(rawIndex);
+
+    return Number.isInteger(index) ? index : null;
+  }
+
+  function startPhotoPointerDrag(index: number) {
+    setDraggedPhotoIndex(index);
+    setDragOverPhotoIndex(index);
+  }
+
+  function updatePhotoPointerDrag(clientX: number, clientY: number) {
+    if (draggedPhotoIndex === null) {
+      return;
+    }
+
+    const index = getPhotoIndexFromPoint(clientX, clientY);
+
+    if (index !== null) {
+      setDragOverPhotoIndex(index);
+    }
+  }
+
+  function finishPhotoPointerDrag(clientX: number, clientY: number) {
+    if (draggedPhotoIndex === null) {
+      return;
+    }
+
+    const dropIndex = getPhotoIndexFromPoint(clientX, clientY);
+
+    if (dropIndex !== null) {
+      reorderProductPhoto(draggedPhotoIndex, dropIndex);
+    }
+
+    setDraggedPhotoIndex(null);
+    setDragOverPhotoIndex(null);
   }
 
   const canContinue =
@@ -847,27 +910,99 @@ function AddProductFlow({
           <Card elevated>
             <div className="grid gap-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {imageUploads.map((upload, index) => (
-                  <div
-                    className="group relative overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]"
-                    key={`${upload.fileName}-${index}`}
-                  >
-                    <img alt="" className="aspect-square w-full object-cover" src={upload.dataUrl} />
-                    <button
-                      aria-label={`Remove ${upload.fileName}`}
-                      className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
-                      onClick={() => removeProductPhoto(index)}
-                      type="button"
+                {imageUploads.map((upload, index) => {
+                  const isDragging = draggedPhotoIndex === index;
+                  const isDropTarget = dragOverPhotoIndex === index && draggedPhotoIndex !== null;
+
+                  return (
+                    <div
+                      className={[
+                        "group relative overflow-hidden rounded-3xl border bg-[var(--bb-surface-warm)] transition",
+                        isDragging
+                          ? "scale-[0.98] border-[var(--bb-blaze)] opacity-70 shadow-lg"
+                          : isDropTarget
+                            ? "border-[var(--bb-blaze)] ring-4 ring-[var(--bb-blaze-soft)]"
+                            : "border-[var(--bb-line)]",
+                      ].join(" ")}
+                      data-product-photo-index={index}
+                      draggable
+                      key={`${upload.fileName}-${index}`}
+                      onDragEnd={() => {
+                        setDraggedPhotoIndex(null);
+                        setDragOverPhotoIndex(null);
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setDragOverPhotoIndex(index);
+                      }}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", String(index));
+                        setDraggedPhotoIndex(index);
+                        setDragOverPhotoIndex(index);
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        const fromIndex = Number(event.dataTransfer.getData("text/plain"));
+
+                        if (Number.isInteger(fromIndex)) {
+                          reorderProductPhoto(fromIndex, index);
+                        }
+
+                        setDraggedPhotoIndex(null);
+                        setDragOverPhotoIndex(null);
+                      }}
+                      onPointerCancel={() => {
+                        setDraggedPhotoIndex(null);
+                        setDragOverPhotoIndex(null);
+                      }}
+                      onPointerDown={(event) => {
+                        if (event.pointerType === "mouse" && event.button !== 0) {
+                          return;
+                        }
+
+                        startPhotoPointerDrag(index);
+                      }}
+                      onPointerMove={(event) => {
+                        updatePhotoPointerDrag(event.clientX, event.clientY);
+                      }}
+                      onPointerUp={(event) => {
+                        finishPhotoPointerDrag(event.clientX, event.clientY);
+                      }}
+                      role="button"
+                      tabIndex={0}
                     >
-                      Remove
-                    </button>
-                    {index === 0 ? (
-                      <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-blaze)] shadow">
-                        Main
-                      </span>
-                    ) : null}
-                  </div>
-                ))}
+                      <img
+                        alt=""
+                        className="aspect-square w-full touch-none select-none object-cover"
+                        draggable={false}
+                        src={upload.dataUrl}
+                      />
+                      <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center justify-between gap-2">
+                        <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-muted)] shadow">
+                          Drag
+                        </span>
+                      </div>
+                      <button
+                        aria-label={`Remove ${upload.fileName}`}
+                        className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          removeProductPhoto(index);
+                        }}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                      {index === 0 ? (
+                        <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-blaze)] shadow">
+                          Main
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                })}
 
                 <label className="grid aspect-square cursor-pointer place-items-center rounded-3xl border-2 border-dashed border-[var(--bb-line)] bg-white transition hover:border-[var(--bb-blaze)] hover:bg-[var(--bb-blaze-soft)]">
                   <span className="grid place-items-center gap-2 text-center">
@@ -889,7 +1024,7 @@ function AddProductFlow({
               </div>
 
               <p className="text-sm font-bold text-[var(--bb-muted)]">
-                Add up to 6 product photos. The first photo becomes the main storefront image.
+                Add up to 6 product photos. Drag photos to reorder them. The first photo becomes the main storefront image.
               </p>
 
               {imageError ? <InlineNotice tone="warning">{imageError}</InlineNotice> : null}
