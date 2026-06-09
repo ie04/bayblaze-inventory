@@ -693,6 +693,7 @@ function AddProductFlow({
   vehicles: DeliveryVehicle[];
   onCreateProductWithVariant: (draft: ProductWithVariantDraft) => void;
 }) {
+  const [currentStep, setCurrentStep] = useState(0);
   const [brand, setBrand] = useState("");
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
@@ -705,6 +706,39 @@ function AddProductFlow({
   const [inventoryState, setInventoryState] = useState<InventoryState>("IN_WAREHOUSE");
   const [availableQuantity, setAvailableQuantity] = useState(0);
   const [vehicleId, setVehicleId] = useState("");
+
+  const steps = [
+    "Product image",
+    "Product identity",
+    "First variant",
+    "Quantity and location",
+    "Review",
+  ];
+
+  const isFirstStep = currentStep === 0;
+  const isLastStep = currentStep === steps.length - 1;
+  const activeVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+
+  const canContinue =
+    currentStep === 0 ||
+    (currentStep === 1 && Boolean(title.trim() && handle.trim() && category.trim())) ||
+    (currentStep === 2 && Boolean(variantTitle.trim() && sku.trim())) ||
+    (currentStep === 3 &&
+      availableQuantity >= 0 &&
+      (inventoryState === "IN_WAREHOUSE" || Boolean(vehicleId))) ||
+    isLastStep;
+
+  function goNext() {
+    if (!canContinue || isLastStep) {
+      return;
+    }
+
+    setCurrentStep((step) => Math.min(step + 1, steps.length - 1));
+  }
+
+  function goBack() {
+    setCurrentStep((step) => Math.max(step - 1, 0));
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -733,94 +767,206 @@ function AddProductFlow({
 
   return (
     <>
-      <PageHeader
-        icon={<Plus size={24} aria-hidden="true" />}
-        title="Add a Product"
-      />
-      <form className="space-y-5" onSubmit={submit}>
+      <PageHeader icon={<Plus size={24} aria-hidden="true" />} title="Add a Product" />
+
+      <form className="space-y-5 pb-28" onSubmit={submit}>
         <Card elevated>
-          <StepHeading
-            step="1"
-            title="Product image"
-          />
-          <div className="mt-4 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
-            <div className="overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
-              {imageUrl.trim() ? (
-                <img alt="" className="aspect-[4/3] w-full object-cover" src={imageUrl.trim()} />
-              ) : (
-                <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
-                  <Image size={32} aria-hidden="true" />
-                </div>
-              )}
-            </div>
-            <Input
-              icon={<Image size={18} aria-hidden="true" />}
-              label="Product image URL"
-              onChange={(event) => setImageUrl(event.target.value)}
-              placeholder="https://..."
-              type="url"
-              value={imageUrl}
+          <div className="flex items-center justify-between gap-3">
+            <StepHeading step={String(currentStep + 1)} title={steps[currentStep]} />
+            <Badge tone="neutral">
+              {currentStep + 1} / {steps.length}
+            </Badge>
+          </div>
+
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--bb-surface-warm)]">
+            <div
+              className="h-full rounded-full bg-[var(--bb-blaze)] transition-all"
+              style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
             />
           </div>
         </Card>
 
-        <Card elevated>
-          <StepHeading
-            step="2"
-            title="Product identity"
-          />
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Input label="Product name" onChange={(event) => setTitle(event.target.value)} placeholder="RAZ TN9000" value={title} />
-            <Input label="Brand" onChange={(event) => setBrand(event.target.value)} placeholder="RAZ" value={brand} />
-            <Input label="Category" onChange={(event) => setCategory(event.target.value)} placeholder="Vapes" value={category} />
-            <Input label="Product handle" onChange={(event) => setHandle(event.target.value)} placeholder="raz-tn9000" value={handle} />
-          </div>
-        </Card>
+        {currentStep === 0 ? (
+          <Card elevated>
+            <div className="grid gap-4">
+              <div className="overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
+                {imageUrl.trim() ? (
+                  <img alt="" className="aspect-[4/3] w-full object-cover" src={imageUrl.trim()} />
+                ) : (
+                  <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
+                    <Image size={34} aria-hidden="true" />
+                  </div>
+                )}
+              </div>
+              <Input
+                icon={<Image size={18} aria-hidden="true" />}
+                label="Product image URL"
+                onChange={(event) => setImageUrl(event.target.value)}
+                placeholder="https://..."
+                type="url"
+                value={imageUrl}
+              />
+            </div>
+          </Card>
+        ) : null}
 
-        <Card elevated>
-          <StepHeading
-            step="3"
-            title="First variant"
-          />
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Input label="Variant name" onChange={(event) => setVariantTitle(event.target.value)} placeholder="Blue Razz Ice" value={variantTitle} />
-            <Input label="SKU" onChange={(event) => setSku(event.target.value)} placeholder="RAZ-TN9000-BRI" value={sku} />
-            <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
-            <Input label="Price" min={0} onChange={(event) => setPrice(event.target.value)} placeholder="24.99" step="0.01" type="number" value={price} />
-          </div>
-        </Card>
+        {currentStep === 1 ? (
+          <Card elevated>
+            <div className="grid gap-3">
+              <Input
+                label="Product name"
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="RAZ TN9000"
+                value={title}
+              />
+              <Input
+                label="Brand"
+                onChange={(event) => setBrand(event.target.value)}
+                placeholder="RAZ"
+                value={brand}
+              />
+              <Input
+                label="Category"
+                onChange={(event) => setCategory(event.target.value)}
+                placeholder="Vapes"
+                value={category}
+              />
+              <Input
+                label="Product handle"
+                onChange={(event) => setHandle(event.target.value)}
+                placeholder="raz-tn9000"
+                value={handle}
+              />
+            </div>
+          </Card>
+        ) : null}
 
-        <Card elevated>
-          <StepHeading
-            step="4"
-            title="Quantity and location"
-          />
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Input label="Available quantity" min={0} onChange={(event) => setAvailableQuantity(Number(event.target.value))} type="number" value={availableQuantity} />
-            <Select label="Stock location" onChange={(event) => setInventoryState(event.target.value as InventoryState)} value={inventoryState}>
-              <option value="IN_WAREHOUSE">In warehouse</option>
-              <option value="ON_VEHICLE">On vehicle</option>
-            </Select>
-            {inventoryState === "ON_VEHICLE" ? (
-              <Select label="Delivery vehicle" onChange={(event) => setVehicleId(event.target.value)} value={vehicleId}>
-                <option value="">Choose vehicle</option>
-                {vehicles
-                  .filter((vehicle) => vehicle.id !== "warehouse")
-                  .map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.label}
-                    </option>
-                  ))}
+        {currentStep === 2 ? (
+          <Card elevated>
+            <div className="grid gap-3">
+              <Input
+                label="Variant name"
+                onChange={(event) => setVariantTitle(event.target.value)}
+                placeholder="Blue Razz Ice"
+                value={variantTitle}
+              />
+              <Input
+                label="SKU"
+                onChange={(event) => setSku(event.target.value)}
+                placeholder="RAZ-TN9000-BRI"
+                value={sku}
+              />
+              <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
+              <Input
+                label="Price"
+                min={0}
+                onChange={(event) => setPrice(event.target.value)}
+                placeholder="24.99"
+                step="0.01"
+                type="number"
+                value={price}
+              />
+            </div>
+          </Card>
+        ) : null}
+
+        {currentStep === 3 ? (
+          <Card elevated>
+            <div className="grid gap-3">
+              <Input
+                label="Available quantity"
+                min={0}
+                onChange={(event) => setAvailableQuantity(Number(event.target.value))}
+                type="number"
+                value={availableQuantity}
+              />
+              <Select
+                label="Stock location"
+                onChange={(event) => {
+                  const nextState = event.target.value as InventoryState;
+                  setInventoryState(nextState);
+
+                  if (nextState === "IN_WAREHOUSE") {
+                    setVehicleId("");
+                  }
+                }}
+                value={inventoryState}
+              >
+                <option value="IN_WAREHOUSE">In warehouse</option>
+                <option value="ON_VEHICLE">On vehicle</option>
               </Select>
-            ) : null}
-          </div>
-          <div className="mt-5">
-            <Button fullWidth loading={busy} type="submit">
-              <Plus size={18} aria-hidden="true" />
-              Create product and first variant
+              {inventoryState === "ON_VEHICLE" ? (
+                <Select label="Delivery vehicle" onChange={(event) => setVehicleId(event.target.value)} value={vehicleId}>
+                  <option value="">Choose vehicle</option>
+                  {vehicles
+                    .filter((vehicle) => vehicle.id !== "warehouse")
+                    .map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.label}
+                      </option>
+                    ))}
+                </Select>
+              ) : null}
+            </div>
+          </Card>
+        ) : null}
+
+        {currentStep === 4 ? (
+          <Card elevated>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">Product</p>
+                <h2 className="mt-1 text-2xl font-black text-[var(--bb-charcoal)]">
+                  {title.trim() || "Untitled product"}
+                </h2>
+                <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                  {brand.trim() ? `${brand.trim()} · ` : ""}
+                  {category.trim() || "No category"}
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-4">
+                <p className="text-xs font-black uppercase text-[var(--bb-muted)]">First variant</p>
+                <p className="mt-1 text-lg font-black text-[var(--bb-charcoal)]">
+                  {variantTitle.trim() || "Untitled variant"}
+                </p>
+                <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                  SKU: {sku.trim() || "Missing"} · Price: {price.trim() ? `$${price.trim()}` : "$0.00"}
+                </p>
+                <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                  {availableQuantity} unit{availableQuantity === 1 ? "" : "s"} ·{" "}
+                  {inventoryState === "ON_VEHICLE"
+                    ? activeVehicle?.label ?? "Vehicle not selected"
+                    : "Warehouse"}
+                </p>
+              </div>
+
+              {!title.trim() || !handle.trim() || !category.trim() || !variantTitle.trim() || !sku.trim() ? (
+                <InlineNotice tone="warning">
+                  Complete product name, handle, category, variant name, and SKU before creating the product.
+                </InlineNotice>
+              ) : null}
+            </div>
+          </Card>
+        ) : null}
+
+        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 rounded-3xl border border-[var(--bb-line)] bg-white/95 p-3 shadow-[0_-12px_30px_rgba(17,24,39,0.08)] backdrop-blur md:bottom-4">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+            <Button disabled={busy || isFirstStep} onClick={goBack} type="button" variant="secondary">
+              Back
             </Button>
+            {isLastStep ? (
+              <Button fullWidth disabled={!canContinue} loading={busy} type="submit">
+                <Plus size={18} aria-hidden="true" />
+                Create product
+              </Button>
+            ) : (
+              <Button fullWidth disabled={!canContinue || busy} onClick={goNext} type="button">
+                Continue
+              </Button>
+            )}
           </div>
-        </Card>
+        </div>
       </form>
     </>
   );
