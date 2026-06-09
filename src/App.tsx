@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import {
   Image,
   Package,
@@ -32,6 +32,7 @@ import type {
   InventorySnapshot,
   InventoryState,
   InventoryVariant,
+  ProductImageUploadDraft,
   ProductUpdateDraft,
   ProductWithVariantDraft,
   VariantDraft,
@@ -698,7 +699,9 @@ function AddProductFlow({
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [imageUpload, setImageUpload] = useState<ProductImageUploadDraft | null>(null);
+  const [imageError, setImageError] = useState("");
   const [variantTitle, setVariantTitle] = useState("");
   const [sku, setSku] = useState("");
   const [barcode, setBarcode] = useState("");
@@ -718,6 +721,48 @@ function AddProductFlow({
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === steps.length - 1;
   const activeVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+
+  async function handleProductPhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setImageError("Choose an image file.");
+      return;
+    }
+
+    const maxBytes = 8 * 1024 * 1024;
+
+    if (file.size > maxBytes) {
+      setImageError("Choose an image under 8 MB.");
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+
+      setImagePreviewUrl(dataUrl);
+      setImageUpload({
+        dataUrl,
+        fileName: file.name || "product-photo",
+        mimeType: file.type || "image/jpeg",
+      });
+      setImageError("");
+    } catch {
+      setImageError("Unable to read that image. Try another photo.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function clearProductPhoto() {
+    setImagePreviewUrl("");
+    setImageUpload(null);
+    setImageError("");
+  }
 
   const canContinue =
     currentStep === 0 ||
@@ -751,7 +796,8 @@ function AddProductFlow({
       title: title.trim(),
       handle: handle.trim(),
       category: category.trim(),
-      imageUrl: imageUrl.trim() || undefined,
+      imageUrl: imageUpload ? undefined : imagePreviewUrl.trim() || undefined,
+      imageUpload: imageUpload ?? undefined,
       variant: {
         barcode: barcode.trim() || undefined,
         brand: brand.trim() || undefined,
@@ -790,22 +836,48 @@ function AddProductFlow({
           <Card elevated>
             <div className="grid gap-4">
               <div className="overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
-                {imageUrl.trim() ? (
-                  <img alt="" className="aspect-[4/3] w-full object-cover" src={imageUrl.trim()} />
+                {imagePreviewUrl ? (
+                  <img alt="" className="aspect-[4/3] w-full object-cover" src={imagePreviewUrl} />
                 ) : (
                   <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
                     <Image size={34} aria-hidden="true" />
                   </div>
                 )}
               </div>
-              <Input
-                icon={<Image size={18} aria-hidden="true" />}
-                label="Product image URL"
-                onChange={(event) => setImageUrl(event.target.value)}
-                placeholder="https://..."
-                type="url"
-                value={imageUrl}
-              />
+
+              <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-[var(--bb-line)] bg-white px-4 py-5 text-center transition hover:border-[var(--bb-blaze)] hover:bg-[var(--bb-blaze-soft)]">
+                <Image size={24} aria-hidden="true" className="text-[var(--bb-blaze)]" />
+                <span className="text-sm font-black text-[var(--bb-charcoal)]">
+                  {imageUpload ? "Choose a different photo" : "Add photo from gallery"}
+                </span>
+                <span className="text-xs font-bold text-[var(--bb-muted)]">
+                  JPG, PNG, or WebP up to 8 MB
+                </span>
+                <input
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleProductPhotoChange}
+                  type="file"
+                />
+              </label>
+
+              {imageUpload ? (
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--bb-line)] bg-white p-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">
+                      {imageUpload.fileName}
+                    </p>
+                    <p className="text-xs font-bold text-[var(--bb-muted)]">
+                      Ready to upload through Medusa
+                    </p>
+                  </div>
+                  <Button onClick={clearProductPhoto} size="sm" type="button" variant="secondary">
+                    Remove
+                  </Button>
+                </div>
+              ) : null}
+
+              {imageError ? <InlineNotice tone="warning">{imageError}</InlineNotice> : null}
             </div>
           </Card>
         ) : null}
@@ -970,6 +1042,26 @@ function AddProductFlow({
       </form>
     </>
   );
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Image file could not be read."));
+      }
+    });
+
+    reader.addEventListener("error", () => {
+      reject(reader.error ?? new Error("Image file could not be read."));
+    });
+
+    reader.readAsDataURL(file);
+  });
 }
 
 function StepHeading({

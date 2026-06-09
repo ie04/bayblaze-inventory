@@ -36,13 +36,6 @@ export type DeliveryVehicle = {
   active: boolean;
 };
 
-export type ContractIssue = {
-  id: string;
-  productTitle: string;
-  variantTitle: string;
-  message: string;
-  severity: "danger" | "warning";
-};
 
 export type InventorySnapshot = {
   products: InventoryProduct[];
@@ -52,10 +45,17 @@ export type InventorySnapshot = {
   warnings?: string[];
 };
 
+export type ProductImageUploadDraft = {
+  dataUrl: string;
+  fileName: string;
+  mimeType: string;
+};
+
 export type ProductDraft = {
   category: string;
   handle: string;
   imageUrl?: string;
+  imageUpload?: ProductImageUploadDraft;
   title: string;
 };
 
