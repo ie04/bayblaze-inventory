@@ -708,6 +708,7 @@ function AddProductFlow({
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUploads, setImageUploads] = useState<Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }>>([]);
   const uploadedImageUrlsRef = useRef<string[]>([]);
+  const removedImageUploadsRef = useRef<Set<ProductImageUploadDraft>>(new Set());
   const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
   const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
   const [dragPreview, setDragPreview] = useState<{ dataUrl: string; x: number; y: number } | null>(null);
@@ -745,7 +746,9 @@ function AddProductFlow({
       const urls = uploadedImageUrlsRef.current;
 
       if (urls.length) {
-        void deleteUploadedProductImages(urls);
+        void deleteUploadedProductImages(urls).catch(() => {
+          // Best-effort abandoned upload cleanup. Medusa also expires stale temporary images.
+        });
       }
     }
 
@@ -844,6 +847,14 @@ function AddProductFlow({
       try {
         const uploadedUrl = await uploadProductImage(imageUpload);
 
+        if (removedImageUploadsRef.current.has(imageUpload)) {
+          removedImageUploadsRef.current.delete(imageUpload);
+          void deleteUploadedProductImage(uploadedUrl).catch(() => {
+            setImageError("Image was removed, but Medusa cleanup failed. It will be cleaned up later.");
+          });
+          continue;
+        }
+
         setImageUploads((current) =>
           current.map((item) =>
             item === imageUpload
@@ -856,6 +867,8 @@ function AddProductFlow({
           ),
         );
       } catch (caught) {
+        removedImageUploadsRef.current.delete(imageUpload);
+
         setImageUploads((current) =>
           current.map((item) =>
             item === imageUpload
@@ -875,7 +888,11 @@ function AddProductFlow({
     const uploadToRemove = imageUploads[indexToRemove];
 
     if (uploadToRemove?.uploadedUrl) {
-      void deleteUploadedProductImage(uploadToRemove.uploadedUrl);
+      void deleteUploadedProductImage(uploadToRemove.uploadedUrl).catch(() => {
+        setImageError("Unable to delete that temporary image from Medusa. It will be cleaned up later.");
+      });
+    } else if (uploadToRemove?.uploading) {
+      removedImageUploadsRef.current.add(uploadToRemove);
     }
 
     setImageUploads((current) => current.filter((_, index) => index !== indexToRemove));
@@ -1469,17 +1486,19 @@ async function deleteUploadedProductImages(urls: string[]) {
     return;
   }
 
-  try {
-    await fetch("/api/inventory-image", {
-      body: JSON.stringify({ urls: uniqueUrls }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-      keepalive: true,
-      method: "DELETE",
-    });
-  } catch {
-    // Best-effort cleanup. Medusa also expires stale temporary images.
+  const response = await fetch("/api/inventory-image", {
+    body: JSON.stringify({ urls: uniqueUrls }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    keepalive: true,
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const message = await readUploadErrorMessage(response);
+
+    throw new Error(`Product image cleanup failed with HTTP ${response.status}: ${message}`);
   }
 }
 
