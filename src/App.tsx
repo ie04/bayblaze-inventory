@@ -1399,6 +1399,12 @@ function AddProductFlow({
 }
 
 async function uploadProductImage(imageUpload: ProductImageUploadDraft) {
+  const maxDataUrlChars = 900_000;
+
+  if (imageUpload.dataUrl.length > maxDataUrlChars) {
+    throw new Error("Product image is still too large after compression. Try a smaller or cropped photo.");
+  }
+
   const response = await fetch("/api/inventory-image", {
     body: JSON.stringify({ imageUpload }),
     headers: {
@@ -1466,10 +1472,10 @@ function compressImageFileToDataUrl(file: File) {
     image.addEventListener("load", () => {
       URL.revokeObjectURL(objectUrl);
 
-      const maxDimension = 1200;
-      const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
-      const width = Math.max(1, Math.round(image.width * scale));
-      const height = Math.max(1, Math.round(image.height * scale));
+      const targetMaxChars = 760_000;
+      const dimensions = [1000, 850, 700, 560];
+      const qualities = [0.68, 0.6, 0.52, 0.44];
+
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
 
@@ -1478,11 +1484,27 @@ function compressImageFileToDataUrl(file: File) {
         return;
       }
 
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(image, 0, 0, width, height);
+      for (const maxDimension of dimensions) {
+        const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
 
-      resolve(canvas.toDataURL("image/jpeg", 0.72));
+        canvas.width = width;
+        canvas.height = height;
+        context.clearRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+
+        for (const quality of qualities) {
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+
+          if (dataUrl.length <= targetMaxChars) {
+            resolve(dataUrl);
+            return;
+          }
+        }
+      }
+
+      reject(new Error("Product image is too large after compression."));
     });
 
     image.addEventListener("error", () => {
