@@ -1038,8 +1038,8 @@ function AddProductFlow({
         ) : null}
 
         <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 rounded-3xl border border-[var(--bb-line)] bg-white/95 p-3 shadow-[0_-12px_30px_rgba(17,24,39,0.08)] backdrop-blur md:bottom-4">
-          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-            <Button disabled={busy || isFirstStep} onClick={goBack} type="button" variant="secondary">
+          <div className="grid grid-cols-2 gap-2">
+            <Button fullWidth disabled={busy || isFirstStep} onClick={goBack} type="button" variant="secondary">
               Back
             </Button>
             {isLastStep ? (
