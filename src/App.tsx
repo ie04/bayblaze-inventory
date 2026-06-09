@@ -717,7 +717,7 @@ function AddProductFlow({
   const [barcode, setBarcode] = useState("");
   const [price, setPrice] = useState("");
   const [inventoryState, setInventoryState] = useState<InventoryState>("IN_WAREHOUSE");
-  const [availableQuantity, setAvailableQuantity] = useState(0);
+  const [availableQuantity, setAvailableQuantity] = useState("");
   const [vehicleId, setVehicleId] = useState("");
 
   const steps = [
@@ -731,6 +731,7 @@ function AddProductFlow({
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === steps.length - 1;
   const activeVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+  const availableQuantityNumber = Number(availableQuantity || "0");
   const addCategoryOptionValue = "__add_category__";
   const visibleCategoryOptions =
     category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
@@ -915,7 +916,9 @@ function AddProductFlow({
       Boolean(title.trim() && handle.trim() && (category.trim() || (isAddingCategory && newCategory.trim())))) ||
     (currentStep === 2 && Boolean(variantTitle.trim() && sku.trim())) ||
     (currentStep === 3 &&
-      availableQuantity >= 0 &&
+      availableQuantity.trim().length > 0 &&
+      Number.isFinite(availableQuantityNumber) &&
+      availableQuantityNumber >= 0 &&
       (inventoryState === "IN_WAREHOUSE" || Boolean(vehicleId))) ||
     isLastStep;
 
@@ -952,7 +955,7 @@ function AddProductFlow({
         brand: brand.trim() || undefined,
         inventoryState,
         priceCents: dollarsToCents(price),
-        quantity: availableQuantity,
+        quantity: availableQuantityNumber,
         sku: sku.trim(),
         title: variantTitle.trim(),
         vehicleId: inventoryState === "ON_VEHICLE" ? vehicleId || undefined : undefined,
@@ -1224,7 +1227,8 @@ function AddProductFlow({
               <Input
                 label="Available quantity"
                 min={0}
-                onChange={(event) => setAvailableQuantity(Number(event.target.value))}
+                onChange={(event) => setAvailableQuantity(event.target.value)}
+                placeholder="0"
                 type="number"
                 value={availableQuantity}
               />
@@ -1282,7 +1286,7 @@ function AddProductFlow({
                   SKU: {sku.trim() || "Missing"} · Price: {price.trim() ? `$${price.trim()}` : "$0.00"}
                 </p>
                 <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
-                  {availableQuantity} unit{availableQuantity === 1 ? "" : "s"} ·{" "}
+                  {availableQuantityNumber} unit{availableQuantityNumber === 1 ? "" : "s"} ·{" "}
                   {inventoryState === "ON_VEHICLE"
                     ? activeVehicle?.label ?? "Vehicle not selected"
                     : "Warehouse"}
