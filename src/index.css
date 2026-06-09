@@ -175,3 +175,18 @@ button {
     animation: none;
   }
 }
+
+
+@keyframes bayblaze-photo-plop {
+  0% {
+    transform: scale(0.86);
+  }
+
+  62% {
+    transform: scale(1.06);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}

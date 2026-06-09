@@ -702,6 +702,8 @@ function AddProductFlow({
   const [imageUploads, setImageUploads] = useState<ProductImageUploadDraft[]>([]);
   const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
   const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ dataUrl: string; x: number; y: number } | null>(null);
+  const [ploppedPhotoIndex, setPloppedPhotoIndex] = useState<number | null>(null);
   const [imageError, setImageError] = useState("");
   const [variantTitle, setVariantTitle] = useState("");
   const [sku, setSku] = useState("");
@@ -807,15 +809,36 @@ function AddProductFlow({
     return Number.isInteger(index) ? index : null;
   }
 
-  function startPhotoPointerDrag(index: number) {
+  function startPhotoDrag(index: number, clientX: number, clientY: number) {
+    const upload = imageUploads[index];
+
+    if (!upload) {
+      return;
+    }
+
     setDraggedPhotoIndex(index);
     setDragOverPhotoIndex(index);
+    setDragPreview({
+      dataUrl: upload.dataUrl,
+      x: clientX,
+      y: clientY,
+    });
   }
 
-  function updatePhotoPointerDrag(clientX: number, clientY: number) {
+  function updatePhotoDrag(clientX: number, clientY: number) {
     if (draggedPhotoIndex === null) {
       return;
     }
+
+    setDragPreview((current) =>
+      current
+        ? {
+            ...current,
+            x: clientX,
+            y: clientY,
+          }
+        : current,
+    );
 
     const index = getPhotoIndexFromPoint(clientX, clientY);
 
@@ -824,27 +847,30 @@ function AddProductFlow({
     }
   }
 
-  function finishPhotoPointerDrag(clientX: number, clientY: number) {
+  function finishPhotoDrag(clientX: number, clientY: number) {
     if (draggedPhotoIndex === null) {
       return;
     }
 
     const dropIndex = getPhotoIndexFromPoint(clientX, clientY);
+    const finalDropIndex = dropIndex ?? dragOverPhotoIndex ?? draggedPhotoIndex;
 
-    if (dropIndex !== null) {
-      reorderProductPhoto(draggedPhotoIndex, dropIndex);
-    }
+    reorderProductPhoto(draggedPhotoIndex, finalDropIndex);
+
+    setPloppedPhotoIndex(finalDropIndex);
+    window.setTimeout(() => {
+      setPloppedPhotoIndex((current) => (current === finalDropIndex ? null : current));
+    }, 240);
 
     setDraggedPhotoIndex(null);
     setDragOverPhotoIndex(null);
+    setDragPreview(null);
   }
 
-  function updatePhotoTouchDrag(touch: React.Touch) {
-    updatePhotoPointerDrag(touch.clientX, touch.clientY);
-  }
-
-  function finishPhotoTouchDrag(touch: React.Touch) {
-    finishPhotoPointerDrag(touch.clientX, touch.clientY);
+  function cancelPhotoDrag() {
+    setDraggedPhotoIndex(null);
+    setDragOverPhotoIndex(null);
+    setDragPreview(null);
   }
 
   const canContinue =
@@ -921,84 +947,53 @@ function AddProductFlow({
                 {imageUploads.map((upload, index) => {
                   const isDragging = draggedPhotoIndex === index;
                   const isDropTarget = dragOverPhotoIndex === index && draggedPhotoIndex !== null;
+                  const didJustPlop = ploppedPhotoIndex === index;
 
                   return (
                     <div
                       className={[
                         "group relative touch-none select-none overflow-hidden rounded-3xl border bg-[var(--bb-surface-warm)] transition",
+                        didJustPlop ? "animate-[bayblaze-photo-plop_240ms_ease-out]" : "",
                         isDragging
-                          ? "scale-[0.98] border-[var(--bb-blaze)] opacity-70 shadow-lg"
+                          ? "scale-[0.92] border-[var(--bb-blaze)] opacity-25"
                           : isDropTarget
                             ? "border-[var(--bb-blaze)] ring-4 ring-[var(--bb-blaze-soft)]"
                             : "border-[var(--bb-line)]",
-                      ].join(" ")}
+                      ].filter(Boolean).join(" ")}
                       data-product-photo-index={index}
-                      draggable
                       key={`${upload.fileName}-${index}`}
-                      onDragEnd={() => {
-                        setDraggedPhotoIndex(null);
-                        setDragOverPhotoIndex(null);
-                      }}
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        setDragOverPhotoIndex(index);
-                      }}
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = "move";
-                        event.dataTransfer.setData("text/plain", String(index));
-                        setDraggedPhotoIndex(index);
-                        setDragOverPhotoIndex(index);
-                      }}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        const fromIndex = Number(event.dataTransfer.getData("text/plain"));
-
-                        if (Number.isInteger(fromIndex)) {
-                          reorderProductPhoto(fromIndex, index);
-                        }
-
-                        setDraggedPhotoIndex(null);
-                        setDragOverPhotoIndex(null);
-                      }}
-                      onPointerCancel={() => {
-                        setDraggedPhotoIndex(null);
-                        setDragOverPhotoIndex(null);
-                      }}
+                      onPointerCancel={cancelPhotoDrag}
                       onPointerDown={(event) => {
                         if (event.pointerType !== "mouse" || event.button !== 0) {
                           return;
                         }
 
-                        startPhotoPointerDrag(index);
+                        startPhotoDrag(index, event.clientX, event.clientY);
                       }}
                       onPointerMove={(event) => {
                         if (event.pointerType !== "mouse") {
                           return;
                         }
 
-                        updatePhotoPointerDrag(event.clientX, event.clientY);
+                        updatePhotoDrag(event.clientX, event.clientY);
                       }}
                       onPointerUp={(event) => {
                         if (event.pointerType !== "mouse") {
                           return;
                         }
 
-                        finishPhotoPointerDrag(event.clientX, event.clientY);
+                        finishPhotoDrag(event.clientX, event.clientY);
                       }}
-                      onTouchCancel={() => {
-                        setDraggedPhotoIndex(null);
-                        setDragOverPhotoIndex(null);
-                      }}
+                      onTouchCancel={cancelPhotoDrag}
                       onTouchEnd={(event) => {
                         const touch = event.changedTouches[0];
 
                         if (!touch) {
-                          setDraggedPhotoIndex(null);
-                          setDragOverPhotoIndex(null);
+                          cancelPhotoDrag();
                           return;
                         }
 
-                        finishPhotoTouchDrag(touch);
+                        finishPhotoDrag(touch.clientX, touch.clientY);
                       }}
                       onTouchMove={(event) => {
                         const touch = event.touches[0];
@@ -1008,11 +1003,16 @@ function AddProductFlow({
                         }
 
                         event.preventDefault();
-                        updatePhotoTouchDrag(touch);
+                        updatePhotoDrag(touch.clientX, touch.clientY);
                       }}
                       onTouchStart={(event) => {
-                        startPhotoPointerDrag(index);
-                        updatePhotoTouchDrag(event.touches[0]);
+                        const touch = event.touches[0];
+
+                        if (!touch) {
+                          return;
+                        }
+
+                        startPhotoDrag(index, touch.clientX, touch.clientY);
                       }}
                       role="button"
                       tabIndex={0}
@@ -1071,6 +1071,20 @@ function AddProductFlow({
               {imageError ? <InlineNotice tone="warning">{imageError}</InlineNotice> : null}
             </div>
           </Card>
+        ) : null}
+
+        {dragPreview ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed z-[9999] size-28 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl border-2 border-white bg-white shadow-2xl transition-transform duration-75"
+            style={{
+              left: dragPreview.x,
+              top: dragPreview.y,
+              transform: "translate(-50%, -50%) scale(0.82) rotate(-2deg)",
+            }}
+          >
+            <img alt="" className="h-full w-full object-cover" src={dragPreview.dataUrl} />
+          </div>
         ) : null}
 
         {currentStep === 1 ? (
