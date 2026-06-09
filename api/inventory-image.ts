@@ -1,5 +1,7 @@
 import type { IncomingMessage } from "node:http";
 
+import Busboy from "busboy";
+
 type VercelRequest = IncomingMessage & {
   body?: unknown;
   method?: string;
@@ -9,6 +11,12 @@ type VercelResponse = {
   status: (code: number) => VercelResponse;
   json: (body: unknown) => void;
   setHeader: (name: string, value: string) => void;
+};
+
+type ParsedUpload = {
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
 };
 
 export const config = {
@@ -35,31 +43,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ message: "Method not allowed." });
   }
 
-  const contentType = readHeader(req.headers["content-type"]);
-
   let medusaResponse: Response;
 
   try {
-    const fetchOptions: RequestInit & { duplex?: "half" } = {
-      body: req as unknown as BodyInit,
-      duplex: "half",
-      headers: {
-        Authorization: `Bearer ${serviceToken}`,
-        ...(contentType ? { "Content-Type": contentType } : {}),
-        "x-bayblaze-service-token": serviceToken,
-      },
-      method: req.method,
-    };
-
-    medusaResponse = await fetch(
-      `${backendUrl}/admin/bayblaze/inventory-images`,
-      fetchOptions,
-    );
+    if (req.method === "POST") {
+      medusaResponse = await forwardImageUpload(req);
+    } else {
+      medusaResponse = await forwardImageCleanup(req);
+    }
   } catch (caught) {
     console.error("Medusa inventory image request failed.", caught);
 
     return res.status(502).json({
-      message: "Medusa inventory image API could not be reached.",
+      message: caught instanceof Error ? caught.message : "Medusa inventory image API could not be reached.",
     });
   }
 
@@ -82,6 +78,158 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(medusaResponse.status).json(responseBody);
+}
+
+async function forwardImageUpload(req: VercelRequest) {
+  const contentType = readHeader(req.headers["content-type"]);
+
+  if (contentType.includes("multipart/form-data")) {
+    const upload = await readMultipartImageUpload(req);
+    const formData = new FormData();
+    const bytes = new Uint8Array(upload.buffer);
+
+    formData.append(
+      "image",
+      new Blob([bytes], { type: upload.mimeType }),
+      upload.fileName,
+    );
+
+    return fetch(`${backendUrl}/admin/bayblaze/inventory-images`, {
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${serviceToken}`,
+        "x-bayblaze-service-token": serviceToken,
+      },
+      method: "POST",
+    });
+  }
+
+  const rawBody = await readRawBody(req);
+
+  return fetch(`${backendUrl}/admin/bayblaze/inventory-images`, {
+    body: rawBody,
+    headers: {
+      Authorization: `Bearer ${serviceToken}`,
+      "Content-Type": contentType || "application/json",
+      "x-bayblaze-service-token": serviceToken,
+    },
+    method: "POST",
+  });
+}
+
+async function forwardImageCleanup(req: VercelRequest) {
+  const rawBody = await readRawBody(req);
+
+  return fetch(`${backendUrl}/admin/bayblaze/inventory-images`, {
+    body: rawBody || "{}",
+    headers: {
+      Authorization: `Bearer ${serviceToken}`,
+      "Content-Type": "application/json",
+      "x-bayblaze-service-token": serviceToken,
+    },
+    method: "DELETE",
+  });
+}
+
+function readMultipartImageUpload(req: VercelRequest) {
+  return new Promise<ParsedUpload>((resolve, reject) => {
+    const contentType = readHeader(req.headers["content-type"]);
+
+    if (!contentType.includes("multipart/form-data")) {
+      reject(new Error("Inventory image upload must be multipart/form-data."));
+      return;
+    }
+
+    const parser = Busboy({
+      headers: {
+        "content-type": contentType,
+      },
+      limits: {
+        files: 1,
+        fileSize: 2 * 1024 * 1024,
+      },
+    });
+
+    const chunks: Buffer[] = [];
+    let fileName = "product-photo.jpg";
+    let mimeType = "image/jpeg";
+    let sawImage = false;
+    let settled = false;
+
+    function fail(error: Error) {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      reject(error);
+    }
+
+    parser.on("file", (fieldName, file, info) => {
+      if (fieldName !== "image") {
+        file.resume();
+        return;
+      }
+
+      sawImage = true;
+      fileName = info.filename || fileName;
+      mimeType = info.mimeType || mimeType;
+
+      file.on("data", (chunk: Buffer) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+
+      file.on("limit", () => {
+        fail(new Error("Product image is too large."));
+      });
+
+      file.on("error", (error) => {
+        fail(error instanceof Error ? error : new Error("Product image stream failed."));
+      });
+    });
+
+    parser.on("error", (error) => {
+      fail(error instanceof Error ? error : new Error("Product image upload parsing failed."));
+    });
+
+    parser.on("finish", () => {
+      if (settled) {
+        return;
+      }
+
+      if (!sawImage || chunks.length === 0) {
+        fail(new Error("Product image upload is required."));
+        return;
+      }
+
+      settled = true;
+      resolve({
+        buffer: Buffer.concat(chunks),
+        fileName,
+        mimeType,
+      });
+    });
+
+    req.pipe(parser);
+  });
+}
+
+function readRawBody(req: IncomingMessage) {
+  return new Promise<string>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+
+    req.on("data", (chunk: Buffer) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    req.on("error", (error) => {
+      reject(error instanceof Error ? error : new Error("Unable to read request body."));
+    });
+
+    req.on("end", () => {
+      resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+  });
 }
 
 function readHeader(value: unknown) {
