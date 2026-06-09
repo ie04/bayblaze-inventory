@@ -1399,17 +1399,18 @@ function AddProductFlow({
 }
 
 async function uploadProductImage(imageUpload: ProductImageUploadDraft) {
-  const maxDataUrlChars = 900_000;
+  const imageBlob = dataUrlToBlob(imageUpload.dataUrl);
+  const maxBytes = 900 * 1024;
 
-  if (imageUpload.dataUrl.length > maxDataUrlChars) {
+  if (imageBlob.size > maxBytes) {
     throw new Error("Product image is still too large after compression. Try a smaller or cropped photo.");
   }
 
+  const formData = new FormData();
+  formData.append("image", imageBlob, imageUpload.fileName || "product-photo.jpg");
+
   const response = await fetch("/api/inventory-image", {
-    body: JSON.stringify({ imageUpload }),
-    headers: {
-      "Content-Type": "application/json",
-    },
+    body: formData,
     method: "POST",
   });
 
@@ -1426,6 +1427,24 @@ async function uploadProductImage(imageUpload: ProductImageUploadDraft) {
   }
 
   return body.url.trim();
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+
+  if (!match) {
+    throw new Error("Product image could not be prepared for upload.");
+  }
+
+  const mimeType = match[1];
+  const binary = window.atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
 }
 
 async function readUploadErrorMessage(response: Response) {
