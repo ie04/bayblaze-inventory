@@ -699,8 +699,7 @@ function AddProductFlow({
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
-  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
-  const [imageUpload, setImageUpload] = useState<ProductImageUploadDraft | null>(null);
+  const [imageUploads, setImageUploads] = useState<ProductImageUploadDraft[]>([]);
   const [imageError, setImageError] = useState("");
   const [variantTitle, setVariantTitle] = useState("");
   const [sku, setSku] = useState("");
@@ -723,44 +722,50 @@ function AddProductFlow({
   const activeVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
 
   async function handleProductPhotoChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
 
-    if (!file) {
-      return;
-    }
-
-    if (!file.type.startsWith("image/")) {
-      setImageError("Choose an image file.");
+    if (!files.length) {
       return;
     }
 
     const maxBytes = 8 * 1024 * 1024;
+    const nextUploads: ProductImageUploadDraft[] = [];
 
-    if (file.size > maxBytes) {
-      setImageError("Choose an image under 8 MB.");
-      return;
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        setImageError("Choose image files only.");
+        event.target.value = "";
+        return;
+      }
+
+      if (file.size > maxBytes) {
+        setImageError("Choose images under 8 MB.");
+        event.target.value = "";
+        return;
+      }
+
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+
+        nextUploads.push({
+          dataUrl,
+          fileName: file.name || "product-photo",
+          mimeType: file.type || "image/jpeg",
+        });
+      } catch {
+        setImageError("Unable to read one of those images. Try another photo.");
+        event.target.value = "";
+        return;
+      }
     }
 
-    try {
-      const dataUrl = await readFileAsDataUrl(file);
-
-      setImagePreviewUrl(dataUrl);
-      setImageUpload({
-        dataUrl,
-        fileName: file.name || "product-photo",
-        mimeType: file.type || "image/jpeg",
-      });
-      setImageError("");
-    } catch {
-      setImageError("Unable to read that image. Try another photo.");
-    } finally {
-      event.target.value = "";
-    }
+    setImageUploads((current) => [...current, ...nextUploads]);
+    setImageError("");
+    event.target.value = "";
   }
 
-  function clearProductPhoto() {
-    setImagePreviewUrl("");
-    setImageUpload(null);
+  function removeProductPhoto(indexToRemove: number) {
+    setImageUploads((current) => current.filter((_, index) => index !== indexToRemove));
     setImageError("");
   }
 
@@ -796,8 +801,7 @@ function AddProductFlow({
       title: title.trim(),
       handle: handle.trim(),
       category: category.trim(),
-      imageUrl: imageUpload ? undefined : imagePreviewUrl.trim() || undefined,
-      imageUpload: imageUpload ?? undefined,
+      imageUploads: imageUploads.length ? imageUploads : undefined,
       variant: {
         barcode: barcode.trim() || undefined,
         brand: brand.trim() || undefined,
@@ -835,47 +839,51 @@ function AddProductFlow({
         {currentStep === 0 ? (
           <Card elevated>
             <div className="grid gap-4">
-              <div className="overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
-                {imagePreviewUrl ? (
-                  <img alt="" className="aspect-[4/3] w-full object-cover" src={imagePreviewUrl} />
-                ) : (
-                  <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
-                    <Image size={34} aria-hidden="true" />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {imageUploads.map((upload, index) => (
+                  <div
+                    className="group relative overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]"
+                    key={`${upload.fileName}-${index}`}
+                  >
+                    <img alt="" className="aspect-square w-full object-cover" src={upload.dataUrl} />
+                    <button
+                      aria-label={`Remove ${upload.fileName}`}
+                      className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
+                      onClick={() => removeProductPhoto(index)}
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                    {index === 0 ? (
+                      <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-blaze)] shadow">
+                        Main
+                      </span>
+                    ) : null}
                   </div>
-                )}
+                ))}
+
+                <label className="grid aspect-square cursor-pointer place-items-center rounded-3xl border-2 border-dashed border-[var(--bb-line)] bg-white transition hover:border-[var(--bb-blaze)] hover:bg-[var(--bb-blaze-soft)]">
+                  <span className="grid place-items-center gap-2 text-center">
+                    <span className="grid size-12 place-items-center rounded-full bg-[var(--bb-blaze-soft)] text-[var(--bb-blaze)]">
+                      <Plus size={28} aria-hidden="true" />
+                    </span>
+                    <span className="text-xs font-black uppercase tracking-wide text-[var(--bb-muted)]">
+                      Add Photo
+                    </span>
+                  </span>
+                  <input
+                    accept="image/*"
+                    className="sr-only"
+                    multiple
+                    onChange={handleProductPhotoChange}
+                    type="file"
+                  />
+                </label>
               </div>
 
-              <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-[var(--bb-line)] bg-white px-4 py-5 text-center transition hover:border-[var(--bb-blaze)] hover:bg-[var(--bb-blaze-soft)]">
-                <Image size={24} aria-hidden="true" className="text-[var(--bb-blaze)]" />
-                <span className="text-sm font-black text-[var(--bb-charcoal)]">
-                  {imageUpload ? "Choose a different photo" : "Add photo from gallery"}
-                </span>
-                <span className="text-xs font-bold text-[var(--bb-muted)]">
-                  JPG, PNG, or WebP up to 8 MB
-                </span>
-                <input
-                  accept="image/*"
-                  className="sr-only"
-                  onChange={handleProductPhotoChange}
-                  type="file"
-                />
-              </label>
-
-              {imageUpload ? (
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--bb-line)] bg-white p-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">
-                      {imageUpload.fileName}
-                    </p>
-                    <p className="text-xs font-bold text-[var(--bb-muted)]">
-                      Ready to upload through Medusa
-                    </p>
-                  </div>
-                  <Button onClick={clearProductPhoto} size="sm" type="button" variant="secondary">
-                    Remove
-                  </Button>
-                </div>
-              ) : null}
+              <p className="text-sm font-bold text-[var(--bb-muted)]">
+                Add one or more product photos. The first photo becomes the main storefront image.
+              </p>
 
               {imageError ? <InlineNotice tone="warning">{imageError}</InlineNotice> : null}
             </div>
