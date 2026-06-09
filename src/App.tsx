@@ -246,10 +246,13 @@ function InventoryScreen({
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
 }) {
+  const categoryOptions = useMemo(() => getCategoryOptions(products), [products]);
+
   if (view === "add-product") {
     return (
       <AddProductFlow
         busy={busy}
+        categoryOptions={categoryOptions}
         vehicles={vehicles}
         onCreateProductWithVariant={onCreateProductWithVariant}
       />
@@ -687,10 +690,12 @@ function ProductEditorDialog({
 
 function AddProductFlow({
   busy,
+  categoryOptions,
   vehicles,
   onCreateProductWithVariant,
 }: {
   busy: boolean;
+  categoryOptions: string[];
   vehicles: DeliveryVehicle[];
   onCreateProductWithVariant: (draft: ProductWithVariantDraft) => void;
 }) {
@@ -699,6 +704,8 @@ function AddProductFlow({
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUploads, setImageUploads] = useState<ProductImageUploadDraft[]>([]);
   const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
   const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
@@ -724,6 +731,35 @@ function AddProductFlow({
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === steps.length - 1;
   const activeVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+  const addCategoryOptionValue = "__add_category__";
+  const visibleCategoryOptions =
+    category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
+
+  function selectAddProductCategory(nextCategory: string) {
+    if (nextCategory === addCategoryOptionValue) {
+      setIsAddingCategory(true);
+      setNewCategory("");
+      return;
+    }
+
+    setCategory(nextCategory);
+    setIsAddingCategory(false);
+    setNewCategory("");
+  }
+
+  function commitNewCategory() {
+    const nextCategory = newCategory.trim();
+
+    if (!nextCategory) {
+      return false;
+    }
+
+    setCategory(nextCategory);
+    setNewCategory("");
+    setIsAddingCategory(false);
+
+    return true;
+  }
 
   async function handleProductPhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -875,7 +911,8 @@ function AddProductFlow({
 
   const canContinue =
     currentStep === 0 ||
-    (currentStep === 1 && Boolean(title.trim() && handle.trim() && category.trim())) ||
+    (currentStep === 1 &&
+      Boolean(title.trim() && handle.trim() && (category.trim() || (isAddingCategory && newCategory.trim())))) ||
     (currentStep === 2 && Boolean(variantTitle.trim() && sku.trim())) ||
     (currentStep === 3 &&
       availableQuantity >= 0 &&
@@ -884,6 +921,10 @@ function AddProductFlow({
 
   function goNext() {
     if (!canContinue || isLastStep) {
+      return;
+    }
+
+    if (currentStep === 1 && isAddingCategory && !commitNewCategory()) {
       return;
     }
 
@@ -1102,12 +1143,42 @@ function AddProductFlow({
                 placeholder="RAZ"
                 value={brand}
               />
-              <Input
-                label="Category"
-                onChange={(event) => setCategory(event.target.value)}
-                placeholder="Vapes"
-                value={category}
-              />
+              <div className="space-y-2">
+                <Select
+                  label="Category"
+                  onChange={(event) => selectAddProductCategory(event.target.value)}
+                  value={isAddingCategory ? addCategoryOptionValue : category}
+                >
+                  <option value="">Choose category</option>
+                  {visibleCategoryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                  <option value={addCategoryOptionValue}>+ Add Category</option>
+                </Select>
+
+                {isAddingCategory ? (
+                  <div className="rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3">
+                    <input
+                      aria-label="New category name"
+                      className="h-11 w-full rounded-full border border-[var(--bb-line)] bg-white px-4 text-sm font-bold text-[var(--bb-charcoal)] outline-none transition placeholder:text-[var(--bb-muted)] focus:border-[var(--bb-blaze)] focus:ring-4 focus:ring-[var(--bb-blaze-soft)]"
+                      onChange={(event) => setNewCategory(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitNewCategory();
+                        }
+                      }}
+                      placeholder="New category name"
+                      value={newCategory}
+                    />
+                    <p className="mt-2 text-xs font-bold text-[var(--bb-muted)]">
+                      This category will be selected when you continue.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
               <Input
                 label="Product handle"
                 onChange={(event) => setHandle(event.target.value)}
