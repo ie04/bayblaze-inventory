@@ -16,6 +16,7 @@ type InventoryMutation =
   | { type: "create-product-with-variant"; draft: ProductWithVariantDraft }
   | { type: "create-variant"; productId: string; draft: VariantDraft }
   | { type: "update-product-details"; productId: string; draft: ProductUpdateDraft }
+  | { type: "delete-product"; productId: string }
   | { type: "update-variant-details"; variantId: string; draft: VariantUpdateDraft }
   | { type: "update-quantity"; variantId: string; quantity: number }
   | { type: "assign-vehicle"; variantId: string; vehicleId: string }
@@ -120,6 +121,13 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
     }
   }
 
+  if (mutation.type === "delete-product") {
+    const index = products.findIndex((item) => item.id === mutation.productId);
+
+    if (index >= 0) {
+      products.splice(index, 1);
+    }
+  }
 
   if (mutation.type === "create-variant") {
     const product = products.find((item) => item.id === mutation.productId);

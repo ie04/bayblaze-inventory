@@ -4,6 +4,7 @@ import {
   Package,
   Plus,
   RefreshCw,
+  Trash2,
   Truck,
   Warehouse,
   X,
@@ -99,6 +100,9 @@ function App() {
       onOpenAddProduct={() => setActiveView("add-product")}
       onUpdateProductDetails={(productId, draft) =>
         void applyMutation({ type: "update-product-details", productId, draft })
+      }
+      onDeleteProduct={(productId) =>
+        void applyMutation({ type: "delete-product", productId })
       }
       onUpdateVariantDetails={(variantId, draft) =>
         void applyMutation({ type: "update-variant-details", variantId, draft })
@@ -222,6 +226,7 @@ function InventoryScreen({
   onOpenAddProduct,
   onSetState,
   onUpdateProductDetails,
+  onDeleteProduct,
   onUpdateVariantDetails,
   onUpdateQuantity,
 }: {
@@ -236,6 +241,7 @@ function InventoryScreen({
   onOpenAddProduct: () => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onDeleteProduct: (productId: string) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
 }) {
@@ -263,6 +269,7 @@ function InventoryScreen({
       onOpenAddProduct={onOpenAddProduct}
       onSetState={onSetState}
       onUpdateProductDetails={onUpdateProductDetails}
+      onDeleteProduct={onDeleteProduct}
       onUpdateQuantity={onUpdateQuantity}
       onUpdateVariantDetails={onUpdateVariantDetails}
     />
@@ -279,6 +286,7 @@ function ProductsView({
   onOpenAddProduct,
   onSetState,
   onUpdateProductDetails,
+  onDeleteProduct,
   onUpdateQuantity,
   onUpdateVariantDetails,
 }: {
@@ -290,6 +298,7 @@ function ProductsView({
   onOpenAddProduct: () => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onDeleteProduct: (productId: string) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
@@ -350,6 +359,7 @@ function ProductsView({
           onCreateVariant={onCreateVariant}
           onSetState={onSetState}
           onUpdateProductDetails={onUpdateProductDetails}
+          onDeleteProduct={onDeleteProduct}
           onUpdateQuantity={onUpdateQuantity}
           onUpdateVariantDetails={onUpdateVariantDetails}
         />
@@ -585,6 +595,7 @@ function ProductEditorDialog({
   onCreateVariant,
   onSetState,
   onUpdateProductDetails,
+  onDeleteProduct,
   onUpdateQuantity,
   onUpdateVariantDetails,
 }: {
@@ -597,6 +608,7 @@ function ProductEditorDialog({
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onDeleteProduct: (productId: string) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
@@ -630,6 +642,10 @@ function ProductEditorDialog({
                 product={product}
                 categoryOptions={categoryOptions}
                 onUpdateProductDetails={onUpdateProductDetails}
+                 onDeleteProduct={() => {
+                   onDeleteProduct(product.id);
+                   onClose();
+                 }}
               />
               <CreateVariantCard
                 busy={busy}
@@ -832,11 +848,13 @@ function ProductDetailsCard({
   product,
   categoryOptions,
   onUpdateProductDetails,
+  onDeleteProduct,
 }: {
   busy: boolean;
   product: InventoryProduct;
   categoryOptions: string[];
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onDeleteProduct: () => void;
 }) {
   const [title, setTitle] = useState(product.title);
   const [handle, setHandle] = useState(product.handle);
@@ -882,7 +900,18 @@ function ProductDetailsCard({
       imageUrl: nextImageUrl || undefined,
       title: title.trim(),
     });
+  }
 
+  function deleteProduct() {
+    const confirmed = window.confirm(
+      `Delete ${product.title}? This removes the product from Medusa inventory and the storefront after sync.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    onDeleteProduct();
   }
 
   return (
@@ -944,6 +973,16 @@ function ProductDetailsCard({
         <Input icon={<Image size={18} aria-hidden="true" />} label="Image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />
         <Button fullWidth loading={busy} type="submit">
           Save product
+        </Button>
+        <Button
+          fullWidth
+          disabled={busy}
+          onClick={deleteProduct}
+          type="button"
+          variant="danger"
+        >
+          <Trash2 size={18} aria-hidden="true" />
+          Delete product
         </Button>
       </form>
     </Card>
