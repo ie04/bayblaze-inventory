@@ -13,9 +13,7 @@ type VercelResponse = {
 };
 
 const bayblazeApiUrl = (process.env.BAYBLAZE_API_URL || "https://api.bayblaze.net").replace(/\/$/, "");
-const bayblazeApiToken =
-  process.env.BAYBLAZE_API_SERVICE_TOKEN ||
-  process.env.BAYBLAZE_INVENTORY_APP_TO_API_TOKEN;
+const bayblazeApiToken = process.env.BAYBLAZE_API_SERVICE_TOKEN;
 
 type DeliveryVehicle = {
   id: string;
