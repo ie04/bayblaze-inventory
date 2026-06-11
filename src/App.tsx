@@ -1839,10 +1839,18 @@ function ProductDetailsCard({
   );
   const [newCategory, setNewCategory] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [imageUrl, setImageUrl] = useState(product.thumbnail ?? "");
+  const [imageUrl, setImageUrl] = useState(product.thumbnail ?? product.imageUrls?.[0] ?? "");
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const productImageUrls = useMemo(() => getProductImageUrls(product, imageUrl), [imageUrl, product]);
   const addCategoryOptionValue = "__add_category__";
   const visibleCategoryOptions =
     category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
+
+  useEffect(() => {
+    if (selectedImageIndex >= productImageUrls.length) {
+      setSelectedImageIndex(0);
+    }
+  }, [productImageUrls.length, selectedImageIndex]);
 
   function selectCategory(nextCategory: string) {
     if (nextCategory === addCategoryOptionValue) {
@@ -1923,16 +1931,15 @@ function ProductDetailsCard({
           tone={product.status === "published" ? "success" : "warning"}
         />
       </div>
-      <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
-        {imageUrl.trim() ? (
-          <img alt="" className="aspect-[4/3] w-full object-cover" src={getInventoryImageSrc(imageUrl.trim())} />
-        ) : (
-          <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
-            <Image size={32} aria-hidden="true" />
-          </div>
-        )}
-      </div>
-      <form className="mt-4 space-y-3" onSubmit={submit}>
+      <div className="mt-4 grid min-h-0 gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
+        <ProductImageBrowser
+          imageUrls={productImageUrls}
+          productTitle={product.title}
+          selectedIndex={selectedImageIndex}
+          onSelect={setSelectedImageIndex}
+        />
+
+        <form className="space-y-3" onSubmit={submit}>
         <Input label="Product name" onChange={(event) => setTitle(event.target.value)} value={title} />
         <Input label="Product handle" onChange={(event) => setHandle(event.target.value)} value={handle} />
         <div className="space-y-2">
@@ -2018,7 +2025,8 @@ function ProductDetailsCard({
           <Trash2 size={18} aria-hidden="true" />
           Delete product
         </Button>
-      </form>
+        </form>
+      </div>
 
       <details className="mt-5 rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3 open:bg-white md:p-4">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-left">
@@ -2066,6 +2074,92 @@ function ProductDetailsCard({
         </div>
       </details>
     </Card>
+  );
+}
+
+function ProductImageBrowser({
+  imageUrls,
+  productTitle,
+  selectedIndex,
+  onSelect,
+}: {
+  imageUrls: string[];
+  productTitle: string;
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+}) {
+  const selectedImageUrl = imageUrls[selectedIndex] ?? imageUrls[0] ?? "";
+
+  return (
+    <aside className="rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3">
+      <div className="overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-white">
+        {selectedImageUrl ? (
+          <img
+            alt={productTitle}
+            className="aspect-square w-full object-contain p-2"
+            src={getInventoryImageSrc(selectedImageUrl)}
+          />
+        ) : (
+          <div className="grid aspect-square place-items-center text-[var(--bb-muted)]">
+            <Image size={30} aria-hidden="true" />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3">
+        <p className="text-xs font-black uppercase text-[var(--bb-muted)]">
+          Product images
+        </p>
+
+        {imageUrls.length > 1 ? (
+          <div
+            className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1"
+            aria-label="Product image thumbnails"
+          >
+            {imageUrls.map((imageUrl, index) => (
+              <button
+                aria-label={`Show product image ${index + 1}`}
+                aria-pressed={selectedIndex === index}
+                className={`grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl border bg-white transition ${
+                  selectedIndex === index
+                    ? "border-[var(--bb-blaze)] ring-2 ring-[var(--bb-blaze-soft)]"
+                    : "border-[var(--bb-line)]"
+                }`}
+                key={`${imageUrl}-${index}`}
+                onClick={() => onSelect(index)}
+                type="button"
+              >
+                <img
+                  alt=""
+                  className="size-full object-cover"
+                  src={getInventoryImageSrc(imageUrl)}
+                />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm font-bold text-[var(--bb-muted)]">
+            {imageUrls.length === 1 ? "1 image available." : "No images yet."}
+          </p>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function getProductImageUrls(product: InventoryProduct, imageOverride = "") {
+  const urls = [
+    imageOverride,
+    ...(product.imageUrls ?? []),
+    product.thumbnail,
+  ];
+
+  return Array.from(
+    new Set(
+      urls
+        .map((url) => (typeof url === "string" ? url.trim() : ""))
+        .filter(Boolean),
+    ),
   );
 }
 
