@@ -253,6 +253,7 @@ function InventoryScreen({
       <AddProductFlow
         busy={busy}
         categoryOptions={categoryOptions}
+        products={products}
         vehicles={vehicles}
         onCreateProductWithVariant={onCreateProductWithVariant}
       />
@@ -691,11 +692,13 @@ function ProductEditorDialog({
 function AddProductFlow({
   busy,
   categoryOptions,
+  products,
   vehicles,
   onCreateProductWithVariant,
 }: {
   busy: boolean;
   categoryOptions: string[];
+  products: InventoryProduct[];
   vehicles: DeliveryVehicle[];
   onCreateProductWithVariant: (draft: ProductWithVariantDraft) => void;
 }) {
@@ -734,6 +737,11 @@ function AddProductFlow({
   const isLastStep = currentStep === steps.length - 1;
   const activeVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
   const availableQuantityNumber = Number(availableQuantity || "0");
+  const normalizedHandle = normalizeProductHandle(handle);
+  const handleAlreadyExists = Boolean(
+    normalizedHandle &&
+      products.some((product) => normalizeProductHandle(product.handle) === normalizedHandle),
+  );
 
   useEffect(() => {
     uploadedImageUrlsRef.current = imageUploads
@@ -975,18 +983,26 @@ function AddProductFlow({
   }
 
   const photosAreReady = imageUploads.every((upload) => !upload.uploading && upload.uploadedUrl);
+  const canSubmit = Boolean(
+    title.trim() &&
+      normalizedHandle &&
+      !handleAlreadyExists &&
+      category.trim() &&
+      variantTitle.trim() &&
+      sku.trim(),
+  );
 
   const canContinue =
     (currentStep === 0 && photosAreReady) ||
     (currentStep === 1 &&
-      Boolean(title.trim() && handle.trim() && (category.trim() || (isAddingCategory && newCategory.trim())))) ||
+      Boolean(title.trim() && normalizedHandle && !handleAlreadyExists && (category.trim() || (isAddingCategory && newCategory.trim())))) ||
     (currentStep === 2 && Boolean(variantTitle.trim() && sku.trim())) ||
     (currentStep === 3 &&
       availableQuantity.trim().length > 0 &&
       Number.isFinite(availableQuantityNumber) &&
       availableQuantityNumber >= 0 &&
       (inventoryState === "IN_WAREHOUSE" || Boolean(vehicleId))) ||
-    isLastStep;
+    (isLastStep && canSubmit);
 
   function goNext() {
     if (!canContinue || isLastStep) {
@@ -1007,13 +1023,13 @@ function AddProductFlow({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!title.trim() || !handle.trim() || !category.trim() || !variantTitle.trim() || !sku.trim()) {
+    if (!title.trim() || !normalizedHandle || handleAlreadyExists || !category.trim() || !variantTitle.trim() || !sku.trim()) {
       return;
     }
 
     onCreateProductWithVariant({
       title: title.trim(),
-      handle: handle.trim(),
+      handle: normalizedHandle,
       category: category.trim(),
       imageUrls: imageUploads.map((upload) => upload.uploadedUrl).filter((url): url is string => Boolean(url)),
       variant: {
@@ -1261,6 +1277,11 @@ function AddProductFlow({
                 placeholder="raz-tn9000"
                 value={handle}
               />
+              {handleAlreadyExists ? (
+                <InlineNotice tone="warning">
+                  A product already uses /{normalizedHandle}. Choose a different handle or edit the existing product.
+                </InlineNotice>
+              ) : null}
             </div>
           </Card>
         ) : null}
@@ -1366,9 +1387,14 @@ function AddProductFlow({
                 </p>
               </div>
 
-              {!title.trim() || !handle.trim() || !category.trim() || !variantTitle.trim() || !sku.trim() ? (
+              {!title.trim() || !normalizedHandle || !category.trim() || !variantTitle.trim() || !sku.trim() ? (
                 <InlineNotice tone="warning">
                   Complete product name, handle, category, variant name, and SKU before creating the product.
+                </InlineNotice>
+              ) : null}
+              {handleAlreadyExists ? (
+                <InlineNotice tone="warning">
+                  A product already uses /{normalizedHandle}. Choose a different handle or edit the existing product.
                 </InlineNotice>
               ) : null}
             </div>
@@ -2001,6 +2027,10 @@ function getCategoryOptions(products: InventoryProduct[]) {
         .filter((category) => category.length > 0),
     ),
   ).sort((first, second) => first.localeCompare(second, undefined, { sensitivity: "base" }));
+}
+
+function normalizeProductHandle(value: string) {
+  return value.trim().toLowerCase().replace(/^\/+|\/+$/g, "");
 }
 
 function flattenVariants(products: InventoryProduct[]) {
