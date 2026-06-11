@@ -1710,14 +1710,9 @@ function ProductDetailsCard({
           Save product
         </Button>
         {product.status === "published" ? (
-          <>
-            <Button fullWidth disabled={busy} onClick={publishProduct} type="button" variant="secondary">
-              Sync storefront visibility
-            </Button>
-            <Button fullWidth disabled={busy} onClick={moveProductToDraft} type="button" variant="quiet">
-              Move to draft
-            </Button>
-          </>
+          <Button fullWidth disabled={busy} onClick={moveProductToDraft} type="button" variant="quiet">
+            Move to draft
+          </Button>
         ) : (
           <Button fullWidth disabled={busy} onClick={publishProduct} type="button" variant="secondary">
             Publish product

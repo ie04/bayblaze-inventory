@@ -69,10 +69,9 @@ Product images are managed on the Medusa product through `thumbnail` and
 `images`; do not require staff to leave the inventory app for routine product
 photo updates. Product publish state is managed through Medusa product
 `status`; inventory staff can publish a reviewed draft product or move a
-published product back to draft from the product editor. Published products also
-offer a `Sync storefront visibility` action that re-sends `status: published`
-so the backend can repair storefront sales-channel linkage for products that are
-already marked published.
+published product back to draft from the product editor. The backend must keep
+storefront sales-channel linkage in sync automatically when products are
+created, published, or saved while already published.
 The inventory Stock screen should remain the direct editor for human-friendly
 variant contract fields: variant name, SKU, brand, barcode, price, available
 quantity, stock location, and delivery vehicle. Avoid exposing raw variable
