@@ -1609,11 +1609,12 @@ function ProductDetailsCard({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextImageUrl = imageUrl.trim();
+    const originalImageUrl = product.thumbnail?.trim() ?? "";
 
     onUpdateProductDetails(product.id, {
       category: category.trim(),
       handle: handle.trim(),
-      imageUrl: nextImageUrl || undefined,
+      imageUrl: nextImageUrl && nextImageUrl !== originalImageUrl ? nextImageUrl : undefined,
       title: title.trim(),
     });
   }

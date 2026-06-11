@@ -11,7 +11,6 @@ export function registerServiceWorker() {
   let hasReloadedForControllerChange = false;
   let lastUpdateCheckAt = 0;
   let activeRegistration: ServiceWorkerRegistration | undefined;
-  let applyWaitingServiceWorker: ((reloadPage?: boolean) => Promise<void>) | undefined;
 
   function reloadOnceWhenNewWorkerControlsPage() {
     if (hasReloadedForControllerChange) {
@@ -52,7 +51,7 @@ export function registerServiceWorker() {
 
   navigator.serviceWorker.addEventListener("controllerchange", reloadOnceWhenNewWorkerControlsPage);
 
-  applyWaitingServiceWorker = registerSW({
+  const applyWaitingServiceWorker = registerSW({
     immediate: true,
     onNeedRefresh() {
       void applyWaitingServiceWorker?.(true);
