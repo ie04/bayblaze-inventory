@@ -13,6 +13,10 @@ type VercelResponse = {
 };
 
 const backendUrl = process.env.MEDUSA_BACKEND_URL?.replace(/\/$/, "");
+const bayblazeApiUrl = process.env.BAYBLAZE_API_URL?.replace(/\/$/, "");
+const bayblazeApiToken =
+  process.env.BAYBLAZE_API_SERVICE_TOKEN ||
+  process.env.BAYBLAZE_INVENTORY_APP_TO_API_TOKEN;
 const serviceToken =
   process.env.BAYBLAZE_INVENTORY_SERVICE_TOKEN ||
   process.env.BAYBLAZE_DRIVER_SERVICE_TOKEN;
@@ -35,7 +39,7 @@ type InventorySnapshot = {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
 
-  if (!backendUrl || !serviceToken) {
+  if ((!bayblazeApiUrl || !bayblazeApiToken) && (!backendUrl || !serviceToken)) {
     return res.status(503).json({
       message: "Inventory API is not configured.",
     });
@@ -48,15 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let medusaResponse: Response;
 
   try {
-    medusaResponse = await fetch(`${backendUrl}/admin/bayblaze/inventory`, {
-      body: req.method === "POST" ? JSON.stringify(req.body ?? {}) : undefined,
-      headers: {
-        Authorization: `Bearer ${serviceToken}`,
-        "Content-Type": "application/json",
-        "x-bayblaze-service-token": serviceToken,
-      },
-      method: req.method,
-    });
+    medusaResponse = await fetchInventoryUpstream(req);
   } catch (caught) {
     console.error("Medusa inventory API request failed.", caught);
 
@@ -81,6 +77,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(medusaResponse.status).json(responseBody);
+}
+
+function fetchInventoryUpstream(req: VercelRequest) {
+  if (bayblazeApiUrl && bayblazeApiToken) {
+    return fetch(`${bayblazeApiUrl}/v1/inventory`, {
+      body: req.method === "POST" ? JSON.stringify(req.body ?? {}) : undefined,
+      headers: {
+        Authorization: `Bearer ${bayblazeApiToken}`,
+        "Content-Type": "application/json",
+      },
+      method: req.method,
+    });
+  }
+
+  return fetch(`${backendUrl}/admin/bayblaze/inventory`, {
+    body: req.method === "POST" ? JSON.stringify(req.body ?? {}) : undefined,
+    headers: {
+      Authorization: `Bearer ${serviceToken}`,
+      "Content-Type": "application/json",
+      "x-bayblaze-service-token": serviceToken,
+    },
+    method: req.method,
+  });
 }
 
 async function mergeFirestoreVehicles(snapshot: InventorySnapshot) {

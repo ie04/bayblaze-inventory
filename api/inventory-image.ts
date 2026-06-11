@@ -26,6 +26,10 @@ export const config = {
 };
 
 const backendUrl = process.env.MEDUSA_BACKEND_URL?.replace(/\/$/, "");
+const bayblazeApiUrl = process.env.BAYBLAZE_API_URL?.replace(/\/$/, "");
+const bayblazeApiToken =
+  process.env.BAYBLAZE_API_SERVICE_TOKEN ||
+  process.env.BAYBLAZE_INVENTORY_APP_TO_API_TOKEN;
 const serviceToken =
   process.env.BAYBLAZE_INVENTORY_SERVICE_TOKEN ||
   process.env.BAYBLAZE_DRIVER_SERVICE_TOKEN;
@@ -33,7 +37,7 @@ const serviceToken =
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
 
-  if (!backendUrl || !serviceToken) {
+  if ((!bayblazeApiUrl || !bayblazeApiToken) && (!backendUrl || !serviceToken)) {
     return res.status(503).json({
       message: "Inventory API is not configured.",
     });
@@ -94,25 +98,18 @@ async function forwardImageUpload(req: VercelRequest) {
       upload.fileName,
     );
 
-    return fetch(`${backendUrl}/admin/bayblaze/inventory-images`, {
+    return fetch(`${getInventoryImageUpstreamUrl()}`, {
       body: formData,
-      headers: {
-        Authorization: `Bearer ${serviceToken}`,
-        "x-bayblaze-service-token": serviceToken,
-      },
+      headers: getInventoryImageUpstreamHeaders(false),
       method: "POST",
     });
   }
 
   const rawBody = await readRawBody(req);
 
-  return fetch(`${backendUrl}/admin/bayblaze/inventory-images`, {
+  return fetch(`${getInventoryImageUpstreamUrl()}`, {
     body: rawBody,
-    headers: {
-      Authorization: `Bearer ${serviceToken}`,
-      "Content-Type": contentType || "application/json",
-      "x-bayblaze-service-token": serviceToken,
-    },
+    headers: getInventoryImageUpstreamHeaders(true, contentType || "application/json"),
     method: "POST",
   });
 }
@@ -120,15 +117,38 @@ async function forwardImageUpload(req: VercelRequest) {
 async function forwardImageCleanup(req: VercelRequest) {
   const rawBody = await readRawBody(req);
 
-  return fetch(`${backendUrl}/admin/bayblaze/inventory-images`, {
+  return fetch(`${getInventoryImageUpstreamUrl()}`, {
     body: rawBody || "{}",
-    headers: {
-      Authorization: `Bearer ${serviceToken}`,
-      "Content-Type": "application/json",
-      "x-bayblaze-service-token": serviceToken,
-    },
+    headers: getInventoryImageUpstreamHeaders(true, "application/json"),
     method: "DELETE",
   });
+}
+
+function getInventoryImageUpstreamUrl() {
+  return bayblazeApiUrl
+    ? `${bayblazeApiUrl}/v1/inventory/images`
+    : `${backendUrl}/admin/bayblaze/inventory-images`;
+}
+
+function getInventoryImageUpstreamHeaders(hasContentType: boolean, contentType = "application/json") {
+  if (bayblazeApiUrl && bayblazeApiToken) {
+    return removeUndefinedHeaders({
+      Authorization: `Bearer ${bayblazeApiToken}`,
+      "Content-Type": hasContentType ? contentType : undefined,
+    });
+  }
+
+  return removeUndefinedHeaders({
+    Authorization: `Bearer ${serviceToken}`,
+    "Content-Type": hasContentType ? contentType : undefined,
+    "x-bayblaze-service-token": serviceToken,
+  });
+}
+
+function removeUndefinedHeaders(headers: Record<string, string | undefined>) {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([, value]) => value !== undefined),
+  ) as Record<string, string>;
 }
 
 function readMultipartImageUpload(req: VercelRequest) {
