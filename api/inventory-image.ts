@@ -25,21 +25,17 @@ export const config = {
   },
 };
 
-const backendUrl = process.env.MEDUSA_BACKEND_URL?.replace(/\/$/, "");
 const bayblazeApiUrl = process.env.BAYBLAZE_API_URL?.replace(/\/$/, "");
 const bayblazeApiToken =
   process.env.BAYBLAZE_API_SERVICE_TOKEN ||
   process.env.BAYBLAZE_INVENTORY_APP_TO_API_TOKEN;
-const serviceToken =
-  process.env.BAYBLAZE_INVENTORY_SERVICE_TOKEN ||
-  process.env.BAYBLAZE_DRIVER_SERVICE_TOKEN;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
 
-  if ((!bayblazeApiUrl || !bayblazeApiToken) && (!backendUrl || !serviceToken)) {
+  if (!bayblazeApiUrl || !bayblazeApiToken) {
     return res.status(503).json({
-      message: "Inventory API is not configured.",
+      message: "BayBlaze API inventory image bridge is not configured.",
     });
   }
 
@@ -47,41 +43,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ message: "Method not allowed." });
   }
 
-  let medusaResponse: Response;
+  let upstreamResponse: Response;
 
   try {
     if (req.method === "POST") {
-      medusaResponse = await forwardImageUpload(req);
+      upstreamResponse = await forwardImageUpload(req);
     } else {
-      medusaResponse = await forwardImageCleanup(req);
+      upstreamResponse = await forwardImageCleanup(req);
     }
   } catch (caught) {
-    console.error("Medusa inventory image request failed.", caught);
+    console.error("BayBlaze inventory image request failed.", caught);
 
     return res.status(502).json({
-      message: caught instanceof Error ? caught.message : "Medusa inventory image API could not be reached.",
+      message: caught instanceof Error ? caught.message : "BayBlaze inventory image API could not be reached.",
     });
   }
 
-  const responseText = await medusaResponse.text();
+  const responseText = await upstreamResponse.text();
   let responseBody: { message?: unknown } | Record<string, unknown>;
 
   try {
     responseBody = responseText ? JSON.parse(responseText) : {};
   } catch {
     responseBody = {
-      message: responseText || "Medusa inventory image API returned a non-JSON response.",
+      message: responseText || "BayBlaze inventory image API returned a non-JSON response.",
     };
   }
 
-  if (!medusaResponse.ok && typeof responseBody.message !== "string") {
+  if (!upstreamResponse.ok && typeof responseBody.message !== "string") {
     responseBody = {
       ...responseBody,
-      message: `Medusa inventory image API failed with HTTP ${medusaResponse.status}.`,
+      message: `BayBlaze inventory image API failed with HTTP ${upstreamResponse.status}.`,
     };
   }
 
-  return res.status(medusaResponse.status).json(responseBody);
+  return res.status(upstreamResponse.status).json(responseBody);
 }
 
 async function forwardImageUpload(req: VercelRequest) {
@@ -125,23 +121,13 @@ async function forwardImageCleanup(req: VercelRequest) {
 }
 
 function getInventoryImageUpstreamUrl() {
-  return bayblazeApiUrl
-    ? `${bayblazeApiUrl}/v1/inventory/images`
-    : `${backendUrl}/admin/bayblaze/inventory-images`;
+  return `${bayblazeApiUrl}/v1/inventory/images`;
 }
 
 function getInventoryImageUpstreamHeaders(hasContentType: boolean, contentType = "application/json") {
-  if (bayblazeApiUrl && bayblazeApiToken) {
-    return removeUndefinedHeaders({
-      Authorization: `Bearer ${bayblazeApiToken}`,
-      "Content-Type": hasContentType ? contentType : undefined,
-    });
-  }
-
   return removeUndefinedHeaders({
-    Authorization: `Bearer ${serviceToken}`,
+    Authorization: `Bearer ${bayblazeApiToken}`,
     "Content-Type": hasContentType ? contentType : undefined,
-    "x-bayblaze-service-token": serviceToken,
   });
 }
 

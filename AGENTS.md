@@ -34,14 +34,15 @@ creating new primitives.
 - Browser code must not expose Medusa admin tokens or service tokens.
 - The PWA calls a same-origin or configured inventory API boundary through
   `VITE_BAYBLAZE_INVENTORY_API_URL`. In Vercel production this should normally
-  be `/api`, which routes to `api/inventory.ts`. That backend boundary now
-  prefers `bayblaze-api` (`BAYBLAZE_API_URL` +
-  `BAYBLAZE_API_SERVICE_TOKEN`) as the shared app-facing API layer and falls
-  back to direct Medusa only when the shared API is not configured. It remains
-  responsible for authenticating staff users and must not expose service tokens
-  to the browser.
-- Vercel server-only inventory proxy variables are `MEDUSA_BACKEND_URL` and
-  `BAYBLAZE_INVENTORY_SERVICE_TOKEN`. Do not prefix these with `VITE_`.
+  be `/api`, which routes to `api/inventory.ts` and `api/inventory-image.ts`.
+  Those backend boundaries must call `bayblaze-api` only through
+  `BAYBLAZE_API_URL` + `BAYBLAZE_API_SERVICE_TOKEN` (or
+  `BAYBLAZE_INVENTORY_APP_TO_API_TOKEN`) and must not fall back to direct
+  Medusa routes. They remain responsible for authenticating staff users and must
+  not expose service tokens to the browser.
+- Do not configure inventory-app direct Medusa server env such as
+  `MEDUSA_BACKEND_URL` or `BAYBLAZE_INVENTORY_SERVICE_TOKEN`; Medusa credentials
+  belong behind `bayblaze-api`.
 - The Vercel `/api/inventory` proxy also reads active vehicles from Firebase
   Firestore `vehicles` with Firebase Admin. Server-only Firebase env may be
   provided either as `FIREBASE_SERVICE_ACCOUNT_JSON` or as
@@ -52,11 +53,8 @@ creating new primitives.
 - Production Vercel settings should use:
   `VITE_BAYBLAZE_INVENTORY_API_URL=/api`,
   `BAYBLAZE_API_URL=<shared bayblaze-api origin>`,
-  `BAYBLAZE_API_SERVICE_TOKEN=<shared app-to-api token>`,
-  `MEDUSA_BACKEND_URL=https://api.bayblaze.net`, and
-  `BAYBLAZE_INVENTORY_SERVICE_TOKEN=<same value Medusa accepts as
-  x-bayblaze-service-token>`. Add Firebase Admin server variables as above for
-  vehicle dropdowns.
+  and `BAYBLAZE_API_SERVICE_TOKEN=<shared app-to-api token>`. Add Firebase Admin
+  server variables as above for vehicle dropdowns.
 - When the inventory API is not configured, the app falls back to demo data for
   local UX work. Demo mutations are in-memory only. When the API URL is
   configured, backend failures must surface as errors instead of silently using
