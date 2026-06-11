@@ -90,6 +90,13 @@ POST /api/inventory
 
 POST /api/inventory
 {
+  "type": "update-product-details",
+  "productId": "...",
+  "draft": { "status": "published" }
+}
+
+POST /api/inventory
+{
   "type": "create-product-with-variant",
   "draft": {
     "title": "...",

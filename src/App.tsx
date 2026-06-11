@@ -1631,9 +1631,21 @@ function ProductDetailsCard({
     onDeleteProduct();
   }
 
+  function togglePublishStatus() {
+    onUpdateProductDetails(product.id, {
+      status: product.status === "published" ? "draft" : "published",
+    });
+  }
+
   return (
     <Card>
-      <SectionHeader title="Product details" />
+      <div className="flex items-center justify-between gap-3">
+        <SectionHeader title="Product details" />
+        <StatusBadge
+          status={product.status === "published" ? "Published" : "Draft"}
+          tone={product.status === "published" ? "success" : "warning"}
+        />
+      </div>
       <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
         {imageUrl.trim() ? (
           <img alt="" className="aspect-[4/3] w-full object-cover" src={imageUrl.trim()} />
@@ -1690,6 +1702,15 @@ function ProductDetailsCard({
         <Input icon={<Image size={18} aria-hidden="true" />} label="Image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />
         <Button fullWidth loading={busy} type="submit">
           Save product
+        </Button>
+        <Button
+          fullWidth
+          disabled={busy}
+          onClick={togglePublishStatus}
+          type="button"
+          variant={product.status === "published" ? "quiet" : "secondary"}
+        >
+          {product.status === "published" ? "Move to draft" : "Publish product"}
         </Button>
         <Button
           fullWidth

@@ -112,6 +112,7 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
     if (product) {
       product.title = mutation.draft.title ?? product.title;
       product.handle = mutation.draft.handle ?? product.handle;
+      product.status = mutation.draft.status ?? product.status;
       product.category = mutation.draft.category ?? product.category;
       product.thumbnail = mutation.draft.imageUrls?.[0] ?? mutation.draft.imageUploads?.[0]?.dataUrl ?? mutation.draft.imageUpload?.dataUrl ?? mutation.draft.imageUrl ?? product.thumbnail;
       product.variants = product.variants.map((variant) => ({

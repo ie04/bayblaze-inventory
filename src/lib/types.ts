@@ -1,4 +1,5 @@
 export type InventoryState = "ON_VEHICLE" | "IN_WAREHOUSE";
+export type ProductStatus = "draft" | "published";
 
 export type VariantMetadata = {
   assignedVehicleId?: string;
@@ -23,7 +24,7 @@ export type InventoryProduct = {
   id: string;
   title: string;
   handle: string;
-  status: "draft" | "published";
+  status: ProductStatus;
   category: string;
   thumbnail?: string;
   variants: InventoryVariant[];
@@ -58,6 +59,7 @@ export type ProductDraft = {
   imageUrls?: string[];
   imageUpload?: ProductImageUploadDraft;
   imageUploads?: ProductImageUploadDraft[];
+  status?: ProductStatus;
   title: string;
 };
 

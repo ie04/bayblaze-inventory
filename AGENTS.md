@@ -67,7 +67,9 @@ creating new primitives.
 Every sellable unit must be represented at the Medusa variant level.
 Product images are managed on the Medusa product through `thumbnail` and
 `images`; do not require staff to leave the inventory app for routine product
-photo updates.
+photo updates. Product publish state is managed through Medusa product
+`status`; inventory staff can publish a reviewed draft product or move a
+published product back to draft from the product editor.
 The inventory Stock screen should remain the direct editor for human-friendly
 variant contract fields: variant name, SKU, brand, barcode, price, available
 quantity, stock location, and delivery vehicle. Avoid exposing raw variable
