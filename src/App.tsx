@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   Image,
   Package,
@@ -649,9 +650,22 @@ function ProductEditorDialog({
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/45 p-2 md:p-6" role="dialog" aria-modal="true">
-      <div className="mx-auto flex max-h-[calc(100svh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--bb-shadow-shell)] md:max-h-[calc(100svh-3rem)] md:rounded-[var(--bb-radius-shell)]">
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/55 p-2 md:p-6"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="flex max-h-[calc(100svh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--bb-shadow-shell)] md:max-h-[calc(100svh-3rem)] md:rounded-[var(--bb-radius-shell)]">
         <header className="flex items-start justify-between gap-3 border-b border-[var(--bb-line)] px-4 py-3 md:px-5 md:py-4">
           <div className="flex min-w-0 items-start gap-3">
             <ProductThumbnail product={product} />
@@ -718,7 +732,8 @@ function ProductEditorDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
