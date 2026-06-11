@@ -154,7 +154,7 @@ function App() {
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <StatusBadge
-                status={snapshot?.source === "api" ? "Medusa API" : "Demo data"}
+                status={snapshot?.source === "api" ? "BayBlaze API" : "Demo data"}
                 tone={snapshot?.source === "api" ? "success" : "warning"}
               />
               <Button
