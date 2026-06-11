@@ -233,6 +233,7 @@ export function AppShell({
   children,
   className,
   footer,
+  fullScreen = false,
   header,
   login = false,
   style,
@@ -241,6 +242,7 @@ export function AppShell({
   children: ReactNode;
   className?: string;
   footer?: ReactNode;
+  fullScreen?: boolean;
   header?: ReactNode;
   login?: boolean;
   style?: HTMLAttributes<HTMLElement>["style"];
@@ -251,6 +253,8 @@ export function AppShell({
       className={cx(
         login
           ? "flex min-h-svh w-full flex-col bg-[length:auto_80%] bg-center bg-no-repeat md:bg-[length:auto_130%]"
+          : fullScreen
+            ? "flex min-h-svh w-full flex-col bg-white"
           : cx(
               "mx-auto flex min-h-svh w-full flex-col bg-white shadow-none md:my-6 md:min-h-[calc(100svh-3rem)] md:overflow-hidden md:rounded-[28px] md:shadow-[var(--bb-shadow-shell)]",
               wide ? "max-w-6xl" : "max-w-md",
