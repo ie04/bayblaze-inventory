@@ -19,8 +19,6 @@ server-only proxy variables:
 ```env
 BAYBLAZE_API_URL=https://api.bayblaze.net
 BAYBLAZE_API_SERVICE_TOKEN=
-MEDUSA_BACKEND_URL=https://api.bayblaze.net
-BAYBLAZE_INVENTORY_SERVICE_TOKEN=
 FIREBASE_PROJECT_ID=bayblaze-driver
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY=
@@ -41,13 +39,13 @@ falling back to demo data.
 Browser code should call a trusted inventory API boundary. Do not expose Medusa
 admin tokens or BayBlaze service tokens in Vite environment variables.
 
-The Vercel `/api/inventory` proxy prefers `BAYBLAZE_API_URL` and forwards to
-`bayblaze-api` with `BAYBLAZE_API_SERVICE_TOKEN`. If those variables are absent,
-it falls back to the legacy direct Medusa proxy. The proxy then merges active
-vehicles from Firebase Firestore. Vehicles are not stored in Medusa; Firestore
-remains the vehicle source used by the driver app. Firestore vehicle sync is
-non-fatal: if Firebase Admin is misconfigured or Firestore is unavailable, the
-app still loads inventory and shows a warning.
+The Vercel `/api/inventory` proxy forwards only to `bayblaze-api` with
+`BAYBLAZE_API_SERVICE_TOKEN`. `BAYBLAZE_API_URL` defaults to
+`https://api.bayblaze.net` when omitted. The proxy then merges active vehicles
+from Firebase Firestore. Vehicles are not stored in Medusa; Firestore remains
+the vehicle source used by the driver app. Firestore vehicle sync is non-fatal:
+if Firebase Admin is misconfigured or Firestore is unavailable, the app still
+loads inventory and shows a warning.
 
 Current frontend adapter shape:
 

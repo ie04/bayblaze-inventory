@@ -38,8 +38,9 @@ creating new primitives.
   Those backend boundaries must call `bayblaze-api` only through
   `BAYBLAZE_API_URL` + `BAYBLAZE_API_SERVICE_TOKEN` (or
   `BAYBLAZE_INVENTORY_APP_TO_API_TOKEN`) and must not fall back to direct
-  Medusa routes. They remain responsible for authenticating staff users and must
-  not expose service tokens to the browser.
+  Medusa routes. `BAYBLAZE_API_URL` defaults to `https://api.bayblaze.net` when
+  omitted. They remain responsible for authenticating staff users and must not
+  expose service tokens to the browser.
 - Do not configure inventory-app direct Medusa server env such as
   `MEDUSA_BACKEND_URL` or `BAYBLAZE_INVENTORY_SERVICE_TOKEN`; Medusa credentials
   belong behind `bayblaze-api`.
