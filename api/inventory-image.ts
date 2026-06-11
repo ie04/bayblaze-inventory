@@ -8,6 +8,7 @@ type VercelRequest = IncomingMessage & {
 };
 
 type VercelResponse = {
+  end: (body?: unknown) => void;
   status: (code: number) => VercelResponse;
   json: (body: unknown) => void;
   setHeader: (name: string, value: string) => void;
@@ -37,14 +38,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  if (req.method !== "POST" && req.method !== "DELETE") {
+  if (req.method !== "GET" && req.method !== "POST" && req.method !== "DELETE") {
     return res.status(405).json({ message: "Method not allowed." });
   }
 
   let upstreamResponse: Response;
 
   try {
-    if (req.method === "POST") {
+    if (req.method === "GET") {
+      upstreamResponse = await forwardImageRead(req);
+    } else if (req.method === "POST") {
       upstreamResponse = await forwardImageUpload(req);
     } else {
       upstreamResponse = await forwardImageCleanup(req);
@@ -55,6 +58,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(502).json({
       message: caught instanceof Error ? caught.message : "BayBlaze inventory image API could not be reached.",
     });
+  }
+
+  if (req.method === "GET") {
+    return sendImageResponse(res, upstreamResponse);
   }
 
   const responseText = await upstreamResponse.text();
@@ -76,6 +83,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(upstreamResponse.status).json(responseBody);
+}
+
+async function forwardImageRead(req: VercelRequest) {
+  const filename = readInventoryImageFilename(req);
+
+  return fetch(`${getInventoryImageUpstreamUrl()}/${encodeURIComponent(filename)}`, {
+    headers: getInventoryImageUpstreamHeaders(false),
+    method: "GET",
+  });
 }
 
 async function forwardImageUpload(req: VercelRequest) {
@@ -133,6 +149,31 @@ function removeUndefinedHeaders(headers: Record<string, string | undefined>) {
   return Object.fromEntries(
     Object.entries(headers).filter(([, value]) => value !== undefined),
   ) as Record<string, string>;
+}
+
+async function sendImageResponse(res: VercelResponse, upstreamResponse: Response) {
+  const contentType = upstreamResponse.headers.get("content-type");
+  const cacheControl = upstreamResponse.headers.get("cache-control");
+
+  if (contentType) {
+    res.setHeader("Content-Type", contentType);
+  }
+
+  res.setHeader("Cache-Control", cacheControl || "public, max-age=300");
+
+  const bytes = Buffer.from(await upstreamResponse.arrayBuffer());
+  return res.status(upstreamResponse.status).end(bytes);
+}
+
+function readInventoryImageFilename(req: VercelRequest) {
+  const url = new URL(req.url || "", "http://inventory.local");
+  const filename = url.searchParams.get("filename") || "";
+
+  if (!/^[a-zA-Z0-9._-]+\.(jpg|jpeg|png|webp|gif)$/i.test(filename)) {
+    throw new Error("Inventory image filename is invalid.");
+  }
+
+  return filename;
 }
 
 function readMultipartImageUpload(req: VercelRequest) {

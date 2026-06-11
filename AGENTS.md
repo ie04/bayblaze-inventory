@@ -70,6 +70,12 @@ photo updates. Product publish state is managed through Medusa product
 published product back to draft from the product editor. The backend must keep
 storefront sales-channel linkage in sync automatically when products are
 created, published, or saved while already published.
+Inventory app image rendering should not request Medusa inventory image URLs
+directly from the browser. Stored Medusa URLs under
+`/bayblaze/inventory-images/{filename}` should render through the same-origin
+`/api/inventory-image?filename={filename}` proxy, which calls
+`bayblaze-api` `GET /v1/inventory/images/{filename}` with the server-only
+API token.
 Product description, Medusa product collection assignment, and storefront
 specification metadata are edited in the inventory product create flow and
 product editor. The inventory API snapshot includes product `description`,

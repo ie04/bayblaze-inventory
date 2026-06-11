@@ -1924,7 +1924,7 @@ function ProductDetailsCard({
       </div>
       <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
         {imageUrl.trim() ? (
-          <img alt="" className="aspect-[4/3] w-full object-cover" src={imageUrl.trim()} />
+          <img alt="" className="aspect-[4/3] w-full object-cover" src={getInventoryImageSrc(imageUrl.trim())} />
         ) : (
           <div className="grid aspect-[4/3] place-items-center text-[var(--bb-muted)]">
             <Image size={32} aria-hidden="true" />
@@ -2026,7 +2026,7 @@ function ProductThumbnail({ product }: { product: InventoryProduct }) {
   return (
     <span className="grid size-14 shrink-0 overflow-hidden rounded-2xl bg-[var(--bb-surface-warm)] text-[var(--bb-muted)] md:size-16">
       {product.thumbnail ? (
-        <img alt="" className="size-full object-cover" src={product.thumbnail} />
+        <img alt="" className="size-full object-cover" src={getInventoryImageSrc(product.thumbnail)} />
       ) : (
         <span className="grid place-items-center">
           <Image size={22} aria-hidden="true" />
@@ -2294,6 +2294,30 @@ function getCategoryOptions(products: InventoryProduct[]) {
 
 function normalizeProductHandle(value: string) {
   return value.trim().toLowerCase().replace(/^\/+|\/+$/g, "");
+}
+
+function getInventoryImageSrc(value: string) {
+  const imageUrl = value.trim();
+
+  if (!imageUrl) {
+    return "";
+  }
+
+  let pathname = "";
+
+  try {
+    pathname = new URL(imageUrl).pathname;
+  } catch {
+    pathname = imageUrl;
+  }
+
+  const match = pathname.match(/\/bayblaze\/inventory-images\/([^/?#]+)$/);
+
+  if (!match) {
+    return imageUrl;
+  }
+
+  return `/api/inventory-image?filename=${encodeURIComponent(match[1])}`;
 }
 
 function flattenVariants(products: InventoryProduct[]) {
