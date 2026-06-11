@@ -1631,9 +1631,15 @@ function ProductDetailsCard({
     onDeleteProduct();
   }
 
-  function togglePublishStatus() {
+  function publishProduct() {
     onUpdateProductDetails(product.id, {
-      status: product.status === "published" ? "draft" : "published",
+      status: "published",
+    });
+  }
+
+  function moveProductToDraft() {
+    onUpdateProductDetails(product.id, {
+      status: "draft",
     });
   }
 
@@ -1703,15 +1709,20 @@ function ProductDetailsCard({
         <Button fullWidth loading={busy} type="submit">
           Save product
         </Button>
-        <Button
-          fullWidth
-          disabled={busy}
-          onClick={togglePublishStatus}
-          type="button"
-          variant={product.status === "published" ? "quiet" : "secondary"}
-        >
-          {product.status === "published" ? "Move to draft" : "Publish product"}
-        </Button>
+        {product.status === "published" ? (
+          <>
+            <Button fullWidth disabled={busy} onClick={publishProduct} type="button" variant="secondary">
+              Sync storefront visibility
+            </Button>
+            <Button fullWidth disabled={busy} onClick={moveProductToDraft} type="button" variant="quiet">
+              Move to draft
+            </Button>
+          </>
+        ) : (
+          <Button fullWidth disabled={busy} onClick={publishProduct} type="button" variant="secondary">
+            Publish product
+          </Button>
+        )}
         <Button
           fullWidth
           disabled={busy}
