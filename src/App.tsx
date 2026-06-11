@@ -1804,15 +1804,27 @@ function ProductDetailsCard({
   collections,
   product,
   categoryOptions,
+  vehicles,
+  onAssignVehicle,
+  onCreateVariant,
+  onSetState,
   onUpdateProductDetails,
   onDeleteProduct,
+  onUpdateQuantity,
+  onUpdateVariantDetails,
 }: {
   busy: boolean;
   collections: InventoryCollection[];
   product: InventoryProduct;
   categoryOptions: string[];
+  vehicles: DeliveryVehicle[];
+  onAssignVehicle: (variantId: string, vehicleId: string) => void;
+  onCreateVariant: (productId: string, draft: VariantDraft) => void;
+  onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onDeleteProduct: () => void;
+  onUpdateQuantity: (variantId: string, quantity: number) => void;
+  onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
   const [title, setTitle] = useState(product.title);
   const [handle, setHandle] = useState(product.handle);
@@ -1903,7 +1915,7 @@ function ProductDetailsCard({
   }
 
   return (
-    <Card>
+    <Card className="flex min-h-full flex-col">
       <div className="flex items-center justify-between gap-3">
         <SectionHeader title="Product details" />
         <StatusBadge
@@ -2007,6 +2019,52 @@ function ProductDetailsCard({
           Delete product
         </Button>
       </form>
+
+      <details className="mt-5 rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3 open:bg-white md:p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-left">
+          <div>
+            <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">
+              Variants
+            </p>
+            <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+              {product.variants.length} variant{product.variants.length === 1 ? "" : "s"} attached to this product
+            </p>
+          </div>
+          <Badge tone="neutral">Open</Badge>
+        </summary>
+
+        <div className="mt-4 space-y-4">
+          <CreateVariantCard
+            busy={busy}
+            productId={product.id}
+            products={[product]}
+            vehicles={vehicles}
+            onCreateVariant={onCreateVariant}
+            onProductChange={() => undefined}
+          />
+
+          {product.variants.length === 0 ? (
+            <EmptyState title="No variants yet">
+              Add the first sellable variant for this product.
+            </EmptyState>
+          ) : (
+            <div className="space-y-3">
+              {product.variants.map((variant) => (
+                <VariantContractCard
+                  busy={busy}
+                  key={`${variant.id}-${variant.updatedAt}-${variant.metadata.availableQuantity}`}
+                  variant={variant}
+                  vehicles={vehicles}
+                  onAssignVehicle={onAssignVehicle}
+                  onSetState={onSetState}
+                  onUpdateQuantity={onUpdateQuantity}
+                  onUpdateVariantDetails={onUpdateVariantDetails}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </details>
     </Card>
   );
 }
