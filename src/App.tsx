@@ -686,50 +686,23 @@ function ProductEditorDialog({
           </Button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-5 md:py-5">
-          <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-            <div className="space-y-5">
-              <ProductDetailsCard
-                busy={busy}
-                collections={collections}
-                product={product}
-                categoryOptions={categoryOptions}
-                onUpdateProductDetails={onUpdateProductDetails}
-                 onDeleteProduct={() => {
-                   onDeleteProduct(product.id);
-                   onClose();
-                 }}
-              />
-              <CreateVariantCard
-                busy={busy}
-                productId={product.id}
-                products={[product]}
-                vehicles={vehicles}
-                onCreateVariant={onCreateVariant}
-                onProductChange={() => undefined}
-              />
-            </div>
-            <div className="space-y-3">
-              <SectionHeader title="Variants" />
-              {product.variants.length === 0 ? (
-                <EmptyState title="No variants yet">
-                  Add the first sellable variant for this product.
-                </EmptyState>
-              ) : (
-                product.variants.map((variant) => (
-                  <VariantContractCard
-                    busy={busy}
-                    key={`${variant.id}-${variant.updatedAt}-${variant.metadata.availableQuantity}`}
-                    variant={variant}
-                    vehicles={vehicles}
-                    onAssignVehicle={onAssignVehicle}
-                    onSetState={onSetState}
-                    onUpdateQuantity={onUpdateQuantity}
-                    onUpdateVariantDetails={onUpdateVariantDetails}
-                  />
-                ))
-              )}
-            </div>
-          </div>
+          <ProductDetailsCard
+            busy={busy}
+            collections={collections}
+            product={product}
+            categoryOptions={categoryOptions}
+            vehicles={vehicles}
+            onAssignVehicle={onAssignVehicle}
+            onCreateVariant={onCreateVariant}
+            onSetState={onSetState}
+            onUpdateProductDetails={onUpdateProductDetails}
+            onDeleteProduct={() => {
+              onDeleteProduct(product.id);
+              onClose();
+            }}
+            onUpdateQuantity={onUpdateQuantity}
+            onUpdateVariantDetails={onUpdateVariantDetails}
+          />
         </div>
       </div>
     </div>,
