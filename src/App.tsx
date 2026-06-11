@@ -70,9 +70,12 @@ function App() {
     setBusy(true);
     setError("");
     try {
-      setSnapshot(await mutateInventory(...args));
+      const nextSnapshot = await mutateInventory(...args);
+      setSnapshot(nextSnapshot);
+      return nextSnapshot;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Inventory update failed.");
+      return null;
     } finally {
       setBusy(false);
     }
@@ -92,9 +95,13 @@ function App() {
       variants={variants}
       vehicles={snapshot.vehicles}
       view={activeView}
-      onCreateProductWithVariant={(draft) =>
-        void applyMutation({ type: "create-product-with-variant", draft })
-      }
+      onCreateProductWithVariant={async (draft) => {
+        const nextSnapshot = await applyMutation({ type: "create-product-with-variant", draft });
+
+        if (nextSnapshot) {
+          setActiveView("products");
+        }
+      }}
       onCreateVariant={(productId, draft) =>
         void applyMutation({ type: "create-variant", productId, draft })
       }
@@ -237,7 +244,7 @@ function InventoryScreen({
   vehicles: DeliveryVehicle[];
   view: View;
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
-  onCreateProductWithVariant: (draft: ProductWithVariantDraft) => void;
+  onCreateProductWithVariant: (draft: ProductWithVariantDraft) => Promise<void> | void;
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
   onOpenAddProduct: () => void;
   onSetState: (variantId: string, state: InventoryState) => void;
@@ -700,7 +707,7 @@ function AddProductFlow({
   categoryOptions: string[];
   products: InventoryProduct[];
   vehicles: DeliveryVehicle[];
-  onCreateProductWithVariant: (draft: ProductWithVariantDraft) => void;
+  onCreateProductWithVariant: (draft: ProductWithVariantDraft) => Promise<void> | void;
 }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [brand, setBrand] = useState("");
