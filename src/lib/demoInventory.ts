@@ -1,4 +1,4 @@
-import type { DeliveryVehicle, InventoryProduct, InventorySnapshot } from "./types";
+import type { DeliveryVehicle, InventoryCollection, InventoryProduct, InventorySnapshot } from "./types";
 
 const now = new Date().toISOString();
 
@@ -8,11 +8,25 @@ export const demoVehicles: DeliveryVehicle[] = [
   { id: "warehouse", label: "Warehouse", active: true },
 ];
 
+export const demoCollections: InventoryCollection[] = [
+  { id: "pcol_best_sellers", title: "Best Sellers", handle: "best-sellers" },
+  { id: "pcol_new_arrivals", title: "New Arrivals", handle: "new-arrivals" },
+];
+
 export const demoProducts: InventoryProduct[] = [
   {
     id: "prod_raz_tn9000",
+    collectionId: "pcol_best_sellers",
+    collectionTitle: "Best Sellers",
+    description: "High-capacity disposable vape with bold flavor delivery.",
     title: "RAZ TN9000",
     handle: "raz-tn9000",
+    metadata: {
+      inventoryCategory: "Vapes",
+      spec_battery: "650mAh",
+      spec_capacity: "12mL",
+      spec_puffs: "9000",
+    },
     status: "published",
     category: "Vapes",
     variants: [
@@ -51,8 +65,12 @@ export const demoProducts: InventoryProduct[] = [
   },
   {
     id: "prod_zyn_6mg",
+    description: "Smoke-free nicotine pouches in a compact can.",
     title: "ZYN Nicotine Pouches",
     handle: "zyn-nicotine-pouches",
+    metadata: {
+      inventoryCategory: "Nicotine",
+    },
     status: "published",
     category: "Nicotine",
     variants: [
@@ -76,8 +94,12 @@ export const demoProducts: InventoryProduct[] = [
   },
   {
     id: "prod_raw_cones",
+    description: "Classic pre-rolled cones for quick packing.",
     title: "RAW Classic Cones",
     handle: "raw-classic-cones",
+    metadata: {
+      inventoryCategory: "Accessories",
+    },
     status: "draft",
     category: "Accessories",
     variants: [
@@ -101,6 +123,7 @@ export const demoProducts: InventoryProduct[] = [
 
 export function createDemoSnapshot(): InventorySnapshot {
   return {
+    collections: structuredClone(demoCollections),
     products: structuredClone(demoProducts),
     vehicles: structuredClone(demoVehicles),
     lastSyncedAt: now,

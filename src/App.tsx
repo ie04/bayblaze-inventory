@@ -24,10 +24,12 @@ import {
   Select,
   SectionHeader,
   StatusBadge,
+  Textarea,
 } from "./components/ui";
 import { loadInventory, mutateInventory } from "./lib/inventoryApi";
 import type {
   DeliveryVehicle,
+  InventoryCollection,
   InventoryProduct,
   InventorySnapshot,
   InventoryState,
@@ -40,6 +42,18 @@ import type {
 } from "./lib/types";
 
 type View = "products" | "add-product" | "vehicles";
+type MetadataRow = { id: string; key: string; value: string };
+
+const productSpecFields = [
+  { key: "spec_puffs", label: "Puffs", placeholder: "9000" },
+  { key: "spec_capacity", label: "Capacity", placeholder: "12mL" },
+  { key: "spec_battery", label: "Battery", placeholder: "650mAh" },
+] as const;
+
+const reservedProductMetadataKeys = new Set([
+  "inventoryCategory",
+  ...productSpecFields.map((field) => field.key),
+]);
 
 const views: Array<{ id: View; icon: ReactNode; label: string }> = [
   { id: "products", icon: <Package size={18} aria-hidden="true" />, label: "Products" },
@@ -91,6 +105,7 @@ function App() {
   const activeScreen = snapshot ? (
     <InventoryScreen
       busy={busy}
+      collections={snapshot.collections}
       products={snapshot.products}
       variants={variants}
       vehicles={snapshot.vehicles}
@@ -224,6 +239,7 @@ function App() {
 
 function InventoryScreen({
   busy,
+  collections,
   products,
   variants,
   vehicles,
@@ -239,6 +255,7 @@ function InventoryScreen({
   onUpdateQuantity,
 }: {
   busy: boolean;
+  collections: InventoryCollection[];
   products: InventoryProduct[];
   variants: InventoryVariant[];
   vehicles: DeliveryVehicle[];
@@ -260,6 +277,7 @@ function InventoryScreen({
       <AddProductFlow
         busy={busy}
         categoryOptions={categoryOptions}
+        collections={collections}
         products={products}
         vehicles={vehicles}
         onCreateProductWithVariant={onCreateProductWithVariant}
@@ -274,6 +292,7 @@ function InventoryScreen({
   return (
     <ProductsView
       busy={busy}
+      collections={collections}
       products={products}
       vehicles={vehicles}
       onAssignVehicle={onAssignVehicle}
@@ -291,6 +310,7 @@ function InventoryScreen({
 
 function ProductsView({
   busy,
+  collections,
   products,
   vehicles,
   onAssignVehicle,
@@ -303,6 +323,7 @@ function ProductsView({
   onUpdateVariantDetails,
 }: {
   busy: boolean;
+  collections: InventoryCollection[];
   products: InventoryProduct[];
   vehicles: DeliveryVehicle[];
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
@@ -363,6 +384,7 @@ function ProductsView({
       {editingProduct ? (
         <ProductEditorDialog
           busy={busy}
+          collections={collections}
           product={editingProduct}
           categoryOptions={categoryOptions}
           vehicles={vehicles}
@@ -599,6 +621,7 @@ function ProductCard({
 
 function ProductEditorDialog({
   busy,
+  collections,
   product,
   categoryOptions,
   vehicles,
@@ -612,6 +635,7 @@ function ProductEditorDialog({
   onUpdateVariantDetails,
 }: {
   busy: boolean;
+  collections: InventoryCollection[];
   product: InventoryProduct;
   categoryOptions: string[];
   vehicles: DeliveryVehicle[];
@@ -651,6 +675,7 @@ function ProductEditorDialog({
             <div className="space-y-5">
               <ProductDetailsCard
                 busy={busy}
+                collections={collections}
                 product={product}
                 categoryOptions={categoryOptions}
                 onUpdateProductDetails={onUpdateProductDetails}
@@ -699,12 +724,14 @@ function ProductEditorDialog({
 function AddProductFlow({
   busy,
   categoryOptions,
+  collections,
   products,
   vehicles,
   onCreateProductWithVariant,
 }: {
   busy: boolean;
   categoryOptions: string[];
+  collections: InventoryCollection[];
   products: InventoryProduct[];
   vehicles: DeliveryVehicle[];
   onCreateProductWithVariant: (draft: ProductWithVariantDraft) => Promise<void> | void;
@@ -714,6 +741,12 @@ function AddProductFlow({
   const [title, setTitle] = useState("");
   const [handle, setHandle] = useState("");
   const [category, setCategory] = useState("");
+  const [collectionId, setCollectionId] = useState("");
+  const [description, setDescription] = useState("");
+  const [specPuffs, setSpecPuffs] = useState("");
+  const [specCapacity, setSpecCapacity] = useState("");
+  const [specBattery, setSpecBattery] = useState("");
+  const [metadataRows, setMetadataRows] = useState<MetadataRow[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUploads, setImageUploads] = useState<Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }>>([]);
@@ -735,6 +768,7 @@ function AddProductFlow({
   const steps = [
     "Product image",
     "Product identity",
+    "Storefront details",
     "First variant",
     "Quantity and location",
     "Review",
@@ -995,6 +1029,10 @@ function AddProductFlow({
       normalizedHandle &&
       !handleAlreadyExists &&
       category.trim() &&
+      description.trim() &&
+      specPuffs.trim() &&
+      specCapacity.trim() &&
+      specBattery.trim() &&
       variantTitle.trim() &&
       sku.trim(),
   );
@@ -1003,8 +1041,9 @@ function AddProductFlow({
     (currentStep === 0 && photosAreReady) ||
     (currentStep === 1 &&
       Boolean(title.trim() && normalizedHandle && !handleAlreadyExists && (category.trim() || (isAddingCategory && newCategory.trim())))) ||
-    (currentStep === 2 && Boolean(variantTitle.trim() && sku.trim())) ||
-    (currentStep === 3 &&
+    (currentStep === 2 && Boolean(description.trim() && specPuffs.trim() && specCapacity.trim() && specBattery.trim())) ||
+    (currentStep === 3 && Boolean(variantTitle.trim() && sku.trim())) ||
+    (currentStep === 4 &&
       availableQuantity.trim().length > 0 &&
       Number.isFinite(availableQuantityNumber) &&
       availableQuantityNumber >= 0 &&
@@ -1030,7 +1069,7 @@ function AddProductFlow({
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!title.trim() || !normalizedHandle || handleAlreadyExists || !category.trim() || !variantTitle.trim() || !sku.trim()) {
+    if (!canSubmit) {
       return;
     }
 
@@ -1038,7 +1077,15 @@ function AddProductFlow({
       title: title.trim(),
       handle: normalizedHandle,
       category: category.trim(),
+      collectionId: collectionId || null,
+      description: description.trim(),
       imageUrls: imageUploads.map((upload) => upload.uploadedUrl).filter((url): url is string => Boolean(url)),
+      metadata: buildProductMetadataDraft({
+        metadataRows,
+        specBattery,
+        specCapacity,
+        specPuffs,
+      }),
       variant: {
         barcode: barcode.trim() || undefined,
         brand: brand.trim() || undefined,
@@ -1296,6 +1343,52 @@ function AddProductFlow({
         {currentStep === 2 ? (
           <Card elevated>
             <div className="grid gap-3">
+              <Textarea
+                label="Product description"
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="High-capacity disposable vape with bold flavor delivery."
+                value={description}
+              />
+              <Select
+                label="Collection"
+                onChange={(event) => setCollectionId(event.target.value)}
+                value={collectionId}
+              >
+                <option value="">No collection</option>
+                {collections.map((collection) => (
+                  <option key={collection.id} value={collection.id}>
+                    {collection.title}
+                  </option>
+                ))}
+              </Select>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Input
+                  label="Puffs"
+                  onChange={(event) => setSpecPuffs(event.target.value)}
+                  placeholder="9000"
+                  value={specPuffs}
+                />
+                <Input
+                  label="Capacity"
+                  onChange={(event) => setSpecCapacity(event.target.value)}
+                  placeholder="12mL"
+                  value={specCapacity}
+                />
+                <Input
+                  label="Battery"
+                  onChange={(event) => setSpecBattery(event.target.value)}
+                  placeholder="650mAh"
+                  value={specBattery}
+                />
+              </div>
+              <MetadataRowsEditor rows={metadataRows} onChange={setMetadataRows} />
+            </div>
+          </Card>
+        ) : null}
+
+        {currentStep === 3 ? (
+          <Card elevated>
+            <div className="grid gap-3">
               <Input
                 label="Variant name"
                 onChange={(event) => setVariantTitle(event.target.value)}
@@ -1322,7 +1415,7 @@ function AddProductFlow({
           </Card>
         ) : null}
 
-        {currentStep === 3 ? (
+        {currentStep === 4 ? (
           <Card elevated>
             <div className="grid gap-3">
               <Input
@@ -1364,7 +1457,7 @@ function AddProductFlow({
           </Card>
         ) : null}
 
-        {currentStep === 4 ? (
+        {currentStep === 5 ? (
           <Card elevated>
             <div className="space-y-4">
               <div>
@@ -1375,6 +1468,20 @@ function AddProductFlow({
                 <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
                   {brand.trim() ? `${brand.trim()} · ` : ""}
                   {category.trim() || "No category"}
+                </p>
+                <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                  {collections.find((collection) => collection.id === collectionId)?.title ?? "No collection"}
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-[var(--bb-line)] bg-white p-4">
+                <p className="text-xs font-black uppercase text-[var(--bb-muted)]">Storefront details</p>
+                <p className="mt-1 text-sm font-bold text-[var(--bb-charcoal)]">
+                  {description.trim() || "Missing description"}
+                </p>
+                <p className="mt-2 text-sm font-bold text-[var(--bb-muted)]">
+                  Puffs: {specPuffs.trim() || "Missing"} · Capacity: {specCapacity.trim() || "Missing"} · Battery:{" "}
+                  {specBattery.trim() || "Missing"}
                 </p>
               </div>
 
@@ -1394,9 +1501,9 @@ function AddProductFlow({
                 </p>
               </div>
 
-              {!title.trim() || !normalizedHandle || !category.trim() || !variantTitle.trim() || !sku.trim() ? (
+              {!canSubmit ? (
                 <InlineNotice tone="warning">
-                  Complete product name, handle, category, variant name, and SKU before creating the product.
+                  Complete product name, handle, category, description, specs, variant name, and SKU before creating the product.
                 </InlineNotice>
               ) : null}
               {handleAlreadyExists ? (
@@ -1592,14 +1699,127 @@ function StepHeading({
   );
 }
 
+function MetadataRowsEditor({
+  rows,
+  onChange,
+}: {
+  rows: MetadataRow[];
+  onChange: (rows: MetadataRow[]) => void;
+}) {
+  function updateRow(rowId: string, field: "key" | "value", value: string) {
+    onChange(rows.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)));
+  }
+
+  function addRow() {
+    onChange([...rows, { id: crypto.randomUUID(), key: "", value: "" }]);
+  }
+
+  function removeRow(rowId: string) {
+    onChange(rows.filter((row) => row.id !== rowId));
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-black uppercase text-[var(--bb-muted)]">Additional metadata</span>
+        <Button onClick={addRow} size="sm" type="button" variant="secondary">
+          <Plus size={16} aria-hidden="true" />
+          Add
+        </Button>
+      </div>
+      {rows.length ? (
+        <div className="space-y-2">
+          {rows.map((row) => (
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2" key={row.id}>
+              <Input
+                aria-label="Metadata key"
+                onChange={(event) => updateRow(row.id, "key", event.target.value)}
+                placeholder="custom_key"
+                value={row.key}
+              />
+              <Input
+                aria-label="Metadata value"
+                onChange={(event) => updateRow(row.id, "value", event.target.value)}
+                placeholder="Value"
+                value={row.value}
+              />
+              <Button
+                aria-label="Remove metadata row"
+                onClick={() => removeRow(row.id)}
+                size="icon"
+                title="Remove metadata row"
+                type="button"
+                variant="quiet"
+              >
+                <Trash2 size={16} aria-hidden="true" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm font-bold text-[var(--bb-muted)]">No extra metadata.</p>
+      )}
+    </div>
+  );
+}
+
+function metadataToRows(metadata: Record<string, string>) {
+  return Object.entries(metadata)
+    .filter(([key, value]) => !reservedProductMetadataKeys.has(key) && value.trim())
+    .sort(([firstKey], [secondKey]) => firstKey.localeCompare(secondKey))
+    .map(([key, value]) => ({ id: crypto.randomUUID(), key, value }));
+}
+
+function buildProductMetadataDraft({
+  metadataRows,
+  originalMetadata = {},
+  specBattery,
+  specCapacity,
+  specPuffs,
+}: {
+  metadataRows: MetadataRow[];
+  originalMetadata?: Record<string, string>;
+  specBattery: string;
+  specCapacity: string;
+  specPuffs: string;
+}) {
+  const metadata: Record<string, string | null> = {
+    spec_battery: specBattery.trim() || null,
+    spec_capacity: specCapacity.trim() || null,
+    spec_puffs: specPuffs.trim() || null,
+  };
+  const nextKeys = new Set<string>(Object.keys(metadata));
+
+  for (const row of metadataRows) {
+    const key = row.key.trim();
+
+    if (!key || reservedProductMetadataKeys.has(key)) {
+      continue;
+    }
+
+    metadata[key] = row.value.trim() || null;
+    nextKeys.add(key);
+  }
+
+  for (const key of Object.keys(originalMetadata)) {
+    if (!reservedProductMetadataKeys.has(key) && !nextKeys.has(key)) {
+      metadata[key] = null;
+    }
+  }
+
+  return metadata;
+}
+
 function ProductDetailsCard({
   busy,
+  collections,
   product,
   categoryOptions,
   onUpdateProductDetails,
   onDeleteProduct,
 }: {
   busy: boolean;
+  collections: InventoryCollection[];
   product: InventoryProduct;
   categoryOptions: string[];
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
@@ -1608,6 +1828,14 @@ function ProductDetailsCard({
   const [title, setTitle] = useState(product.title);
   const [handle, setHandle] = useState(product.handle);
   const [category, setCategory] = useState(product.category);
+  const [collectionId, setCollectionId] = useState(product.collectionId ?? "");
+  const [description, setDescription] = useState(product.description);
+  const [specPuffs, setSpecPuffs] = useState(product.metadata.spec_puffs ?? "");
+  const [specCapacity, setSpecCapacity] = useState(product.metadata.spec_capacity ?? "");
+  const [specBattery, setSpecBattery] = useState(product.metadata.spec_battery ?? "");
+  const [metadataRows, setMetadataRows] = useState<MetadataRow[]>(() =>
+    metadataToRows(product.metadata),
+  );
   const [newCategory, setNewCategory] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUrl, setImageUrl] = useState(product.thumbnail ?? "");
@@ -1646,8 +1874,17 @@ function ProductDetailsCard({
 
     onUpdateProductDetails(product.id, {
       category: category.trim(),
+      collectionId: collectionId || null,
+      description: description.trim(),
       handle: handle.trim(),
       imageUrl: nextImageUrl && nextImageUrl !== originalImageUrl ? nextImageUrl : undefined,
+      metadata: buildProductMetadataDraft({
+        metadataRows,
+        originalMetadata: product.metadata,
+        specBattery,
+        specCapacity,
+        specPuffs,
+      }),
       title: title.trim(),
     });
   }
@@ -1738,6 +1975,25 @@ function ProductDetailsCard({
             </div>
           ) : null}
         </div>
+        <Textarea
+          label="Product description"
+          onChange={(event) => setDescription(event.target.value)}
+          value={description}
+        />
+        <Select label="Collection" onChange={(event) => setCollectionId(event.target.value)} value={collectionId}>
+          <option value="">No collection</option>
+          {collections.map((collection) => (
+            <option key={collection.id} value={collection.id}>
+              {collection.title}
+            </option>
+          ))}
+        </Select>
+        <div className="grid gap-3">
+          <Input label="Puffs" onChange={(event) => setSpecPuffs(event.target.value)} value={specPuffs} />
+          <Input label="Capacity" onChange={(event) => setSpecCapacity(event.target.value)} value={specCapacity} />
+          <Input label="Battery" onChange={(event) => setSpecBattery(event.target.value)} value={specBattery} />
+        </div>
+        <MetadataRowsEditor rows={metadataRows} onChange={setMetadataRows} />
         <Input icon={<Image size={18} aria-hidden="true" />} label="Image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />
         <Button fullWidth loading={busy} type="submit">
           Save product

@@ -22,12 +22,22 @@ export type InventoryVariant = {
 
 export type InventoryProduct = {
   id: string;
+  collectionId?: string;
+  collectionTitle?: string;
+  description: string;
   title: string;
   handle: string;
+  metadata: Record<string, string>;
   status: ProductStatus;
   category: string;
   thumbnail?: string;
   variants: InventoryVariant[];
+};
+
+export type InventoryCollection = {
+  id: string;
+  title: string;
+  handle?: string;
 };
 
 export type DeliveryVehicle = {
@@ -39,6 +49,7 @@ export type DeliveryVehicle = {
 
 
 export type InventorySnapshot = {
+  collections: InventoryCollection[];
   products: InventoryProduct[];
   vehicles: DeliveryVehicle[];
   lastSyncedAt: string;
@@ -54,11 +65,14 @@ export type ProductImageUploadDraft = {
 
 export type ProductDraft = {
   category: string;
+  collectionId?: string | null;
+  description?: string;
   handle: string;
   imageUrl?: string;
   imageUrls?: string[];
   imageUpload?: ProductImageUploadDraft;
   imageUploads?: ProductImageUploadDraft[];
+  metadata?: Record<string, string | null>;
   status?: ProductStatus;
   title: string;
 };

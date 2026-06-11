@@ -72,6 +72,13 @@ photo updates. Product publish state is managed through Medusa product
 published product back to draft from the product editor. The backend must keep
 storefront sales-channel linkage in sync automatically when products are
 created, published, or saved while already published.
+Product description, Medusa product collection assignment, and storefront
+specification metadata are edited in the inventory product create flow and
+product editor. The inventory API snapshot includes product `description`,
+`collectionId`, `collectionTitle`, editable product `metadata`, and the
+available Medusa `collections` list. Storefront spec fields should be stored as
+product metadata keys `spec_puffs`, `spec_capacity`, and `spec_battery`; keep
+`inventoryCategory` as the product metadata bridge for BayBlaze category labels.
 The inventory Stock screen should remain the direct editor for human-friendly
 variant contract fields: variant name, SKU, brand, barcode, price, available
 quantity, stock location, and delivery vehicle. Avoid exposing raw variable

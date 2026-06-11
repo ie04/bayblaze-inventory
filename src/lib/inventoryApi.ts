@@ -78,8 +78,12 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
   if (mutation.type === "create-product-with-variant") {
     const product: InventoryProduct = {
       id: crypto.randomUUID(),
+      collectionId: mutation.draft.collectionId || undefined,
+      collectionTitle: snapshot.collections.find((collection) => collection.id === mutation.draft.collectionId)?.title,
+      description: mutation.draft.description ?? "",
       title: mutation.draft.title,
       handle: mutation.draft.handle,
+      metadata: mutation.draft.metadata ? toDemoProductMetadata(mutation.draft.metadata) : {},
       status: "draft",
       category: mutation.draft.category,
       thumbnail: mutation.draft.imageUrls?.[0] ?? mutation.draft.imageUploads?.[0]?.dataUrl ?? mutation.draft.imageUpload?.dataUrl ?? mutation.draft.imageUrl,
@@ -88,6 +92,8 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
           id: "",
           title: mutation.draft.title,
           handle: mutation.draft.handle,
+          description: mutation.draft.description ?? "",
+          metadata: mutation.draft.metadata ? toDemoProductMetadata(mutation.draft.metadata) : {},
           status: "draft",
           category: mutation.draft.category,
           thumbnail: mutation.draft.imageUrls?.[0] ?? mutation.draft.imageUploads?.[0]?.dataUrl ?? mutation.draft.imageUpload?.dataUrl ?? mutation.draft.imageUrl,
@@ -112,6 +118,16 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
     if (product) {
       product.title = mutation.draft.title ?? product.title;
       product.handle = mutation.draft.handle ?? product.handle;
+      product.collectionId = mutation.draft.collectionId === null
+        ? undefined
+        : mutation.draft.collectionId ?? product.collectionId;
+      product.collectionTitle = product.collectionId
+        ? snapshot.collections.find((collection) => collection.id === product.collectionId)?.title
+        : undefined;
+      product.description = mutation.draft.description ?? product.description;
+      product.metadata = mutation.draft.metadata
+        ? applyDemoProductMetadata(product.metadata, mutation.draft.metadata)
+        : product.metadata;
       product.status = mutation.draft.status ?? product.status;
       product.category = mutation.draft.category ?? product.category;
       product.thumbnail = mutation.draft.imageUrls?.[0] ?? mutation.draft.imageUploads?.[0]?.dataUrl ?? mutation.draft.imageUpload?.dataUrl ?? mutation.draft.imageUrl ?? product.thumbnail;
@@ -181,6 +197,35 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
     products,
     lastSyncedAt: updatedAt,
   };
+}
+
+function toDemoProductMetadata(metadata: Record<string, string | null>) {
+  return Object.fromEntries(
+    Object.entries(metadata).flatMap(([key, value]) => {
+      if (value === null || !value.trim()) {
+        return [];
+      }
+
+      return [[key, value.trim()]];
+    }),
+  );
+}
+
+function applyDemoProductMetadata(
+  currentMetadata: Record<string, string>,
+  metadata: Record<string, string | null>,
+) {
+  const nextMetadata = { ...currentMetadata };
+
+  for (const [key, value] of Object.entries(metadata)) {
+    if (value === null || !value.trim()) {
+      delete nextMetadata[key];
+    } else {
+      nextMetadata[key] = value.trim();
+    }
+  }
+
+  return nextMetadata;
 }
 
 function toDemoVariant(
