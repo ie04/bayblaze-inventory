@@ -31,6 +31,7 @@ export type InventoryProduct = {
   status: ProductStatus;
   category: string;
   thumbnail?: string;
+  imageUrls?: string[];
   variants: InventoryVariant[];
 };
 

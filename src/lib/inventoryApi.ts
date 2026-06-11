@@ -87,6 +87,7 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
       status: "draft",
       category: mutation.draft.category,
       thumbnail: mutation.draft.imageUrls?.[0] ?? mutation.draft.imageUploads?.[0]?.dataUrl ?? mutation.draft.imageUpload?.dataUrl ?? mutation.draft.imageUrl,
+      imageUrls: mutation.draft.imageUrls ?? mutation.draft.imageUploads?.map((upload) => upload.dataUrl) ?? (mutation.draft.imageUrl ? [mutation.draft.imageUrl] : undefined),
       variants: [toDemoVariant(
         {
           id: "",
@@ -131,6 +132,7 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
       product.status = mutation.draft.status ?? product.status;
       product.category = mutation.draft.category ?? product.category;
       product.thumbnail = mutation.draft.imageUrls?.[0] ?? mutation.draft.imageUploads?.[0]?.dataUrl ?? mutation.draft.imageUpload?.dataUrl ?? mutation.draft.imageUrl ?? product.thumbnail;
+      product.imageUrls = mutation.draft.imageUrls ?? mutation.draft.imageUploads?.map((upload) => upload.dataUrl) ?? (mutation.draft.imageUrl ? [mutation.draft.imageUrl] : product.imageUrls);
       product.variants = product.variants.map((variant) => ({
         ...variant,
         productTitle: product.title,
