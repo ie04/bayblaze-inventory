@@ -585,7 +585,7 @@ function ProductCard({
   onSelect: () => void;
 }) {
   const units = product.variants.reduce((sum, variant) => sum + variant.metadata.availableQuantity, 0);
-  const brand = product.variants.find((variant) => variant.metadata.brand)?.metadata.brand;
+  const brand = getProductVariantBrand(product);
   const cheapestVariant = product.variants.reduce<InventoryVariant | null>(
     (lowest, variant) => (!lowest || variant.priceCents < lowest.priceCents ? variant : lowest),
     null,
@@ -707,6 +707,7 @@ function ProductEditorDialog({
             <AddVariantWizard
               busy={busy}
               product={product}
+              productBrand={getProductVariantBrand(product)}
               vehicles={vehicles}
               onCancel={() => setEditorMode("details")}
               onCreateVariant={(draft) => {
@@ -1874,6 +1875,7 @@ function ProductDetailsCard({
   const productImageUrls = useMemo(() => getProductImageUrls(product, imageUrl), [imageUrl, product]);
   const safeSelectedImageIndex =
     productImageUrls.length > 0 ? Math.min(selectedImageIndex, productImageUrls.length - 1) : 0;
+  const productBrand = getProductVariantBrand(product);
   const addCategoryOptionValue = "__add_category__";
   const visibleCategoryOptions =
     category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
@@ -2083,6 +2085,7 @@ function ProductDetailsCard({
                 <VariantContractCard
                   busy={busy}
                   key={`${variant.id}-${variant.updatedAt}-${variant.metadata.availableQuantity}`}
+                  productBrand={productBrand}
                   variant={variant}
                   vehicles={vehicles}
                   onAssignVehicle={onAssignVehicle}
@@ -2185,6 +2188,10 @@ function getProductImageUrls(product: InventoryProduct, imageOverride = "") {
   );
 }
 
+function getProductVariantBrand(product: InventoryProduct) {
+  return product.variants.find((variant) => variant.metadata.brand?.trim())?.metadata.brand?.trim() ?? "";
+}
+
 function ProductThumbnail({ product }: { product: InventoryProduct }) {
   return (
     <span className="grid size-14 shrink-0 overflow-hidden rounded-2xl bg-[var(--bb-surface-warm)] text-[var(--bb-muted)] md:size-16">
@@ -2202,12 +2209,14 @@ function ProductThumbnail({ product }: { product: InventoryProduct }) {
 function AddVariantWizard({
   busy,
   product,
+  productBrand,
   vehicles,
   onCancel,
   onCreateVariant,
 }: {
   busy: boolean;
   product: InventoryProduct;
+  productBrand: string;
   vehicles: DeliveryVehicle[];
   onCancel: () => void;
   onCreateVariant: (draft: VariantDraft) => void;
@@ -2222,7 +2231,7 @@ function AddVariantWizard({
   const [imageError, setImageError] = useState("");
   const [title, setTitle] = useState("");
   const [sku, setSku] = useState("");
-  const [brand, setBrand] = useState("");
+  const [brand, setBrand] = useState(productBrand);
   const [barcode, setBarcode] = useState("");
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -2475,7 +2484,7 @@ function AddVariantWizard({
 
     onCreateVariant({
       barcode: barcode.trim() || undefined,
-      brand: brand.trim() || undefined,
+      brand: (productBrand || brand).trim() || undefined,
       imageUrls: imageUploads.map((upload) => upload.uploadedUrl).filter((url): url is string => Boolean(url)),
       inventoryState,
       priceCents: dollarsToCents(price),
@@ -2652,7 +2661,12 @@ function AddVariantWizard({
             <Input label="Variant name" onChange={(event) => setTitle(event.target.value)} placeholder="Blue Razz Ice" value={title} />
             <Input label="SKU" onChange={(event) => setSku(event.target.value)} placeholder="RAZ-TN9000-BRI" value={sku} />
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input label="Brand" onChange={(event) => setBrand(event.target.value)} value={brand} />
+              <Input
+                disabled={Boolean(productBrand)}
+                label="Brand"
+                onChange={(event) => setBrand(event.target.value)}
+                value={productBrand || brand}
+              />
               <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
             </div>
             <Input
@@ -2774,6 +2788,7 @@ function AddVariantWizard({
 
 function VariantContractCard({
   busy,
+  productBrand,
   variant,
   vehicles,
   onAssignVehicle,
@@ -2782,6 +2797,7 @@ function VariantContractCard({
   onUpdateVariantDetails,
 }: {
   busy: boolean;
+  productBrand: string;
   variant: InventoryVariant;
   vehicles: DeliveryVehicle[];
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
@@ -2791,7 +2807,7 @@ function VariantContractCard({
 }) {
   const [title, setTitle] = useState(variant.title);
   const [sku, setSku] = useState(variant.sku);
-  const [brand, setBrand] = useState(variant.metadata.brand ?? "");
+  const [brand, setBrand] = useState(productBrand || variant.metadata.brand || "");
   const [barcode, setBarcode] = useState(variant.metadata.barcode ?? "");
   const [price, setPrice] = useState(centsToDollarsString(variant.priceCents));
   const [quantity, setQuantity] = useState(variant.metadata.availableQuantity);
@@ -2806,7 +2822,7 @@ function VariantContractCard({
 
     onUpdateVariantDetails(variant.id, {
       barcode: barcode.trim() || undefined,
-      brand: brand.trim() || undefined,
+      brand: (productBrand || brand).trim() || undefined,
       inventoryState,
       priceCents: dollarsToCents(price),
       quantity,
@@ -2839,7 +2855,12 @@ function VariantContractCard({
         <div className="grid gap-3 sm:grid-cols-2">
           <Input label="Variant name" onChange={(event) => setTitle(event.target.value)} value={title} />
           <Input label="SKU" onChange={(event) => setSku(event.target.value)} value={sku} />
-          <Input label="Brand" onChange={(event) => setBrand(event.target.value)} value={brand} />
+          <Input
+            disabled={Boolean(productBrand)}
+            label="Brand"
+            onChange={(event) => setBrand(event.target.value)}
+            value={productBrand || brand}
+          />
           <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
           <Input label="Price" min={0} onChange={(event) => setPrice(event.target.value)} step="0.01" type="number" value={price} />
           <Input label="Available quantity" min={0} onChange={(event) => setQuantity(Number(event.target.value))} type="number" value={quantity} />
