@@ -2215,6 +2215,10 @@ function AddVariantWizard({
   const [currentStep, setCurrentStep] = useState(0);
   const [imageUploads, setImageUploads] = useState<Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }>>([]);
   const removedImageUploadsRef = useRef<Set<ProductImageUploadDraft>>(new Set());
+  const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
+  const [dragOverPhotoIndex, setDragOverPhotoIndex] = useState<number | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ dataUrl: string; x: number; y: number } | null>(null);
+  const [ploppedPhotoIndex, setPloppedPhotoIndex] = useState<number | null>(null);
   const [imageError, setImageError] = useState("");
   const [title, setTitle] = useState("");
   const [sku, setSku] = useState("");
@@ -2354,7 +2358,100 @@ function AddVariantWizard({
     }
 
     setImageUploads((current) => current.filter((_, index) => index !== indexToRemove));
+    setDraggedPhotoIndex(null);
+    setDragOverPhotoIndex(null);
     setImageError("");
+  }
+
+  function reorderVariantPhoto(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) {
+      return;
+    }
+
+    setImageUploads((current) => {
+      if (fromIndex >= current.length || toIndex >= current.length) {
+        return current;
+      }
+
+      const nextUploads = [...current];
+      const [movedUpload] = nextUploads.splice(fromIndex, 1);
+      nextUploads.splice(toIndex, 0, movedUpload);
+
+      return nextUploads;
+    });
+  }
+
+  function getVariantPhotoIndexFromPoint(clientX: number, clientY: number) {
+    const element = document.elementFromPoint(clientX, clientY);
+    const photoTile = element?.closest("[data-variant-photo-index]");
+    const rawIndex = photoTile?.getAttribute("data-variant-photo-index");
+    const index = Number(rawIndex);
+
+    return Number.isInteger(index) ? index : null;
+  }
+
+  function startVariantPhotoDrag(index: number, clientX: number, clientY: number) {
+    const upload = imageUploads[index];
+
+    if (!upload) {
+      return;
+    }
+
+    setDraggedPhotoIndex(index);
+    setDragOverPhotoIndex(index);
+    setDragPreview({
+      dataUrl: upload.dataUrl,
+      x: clientX,
+      y: clientY,
+    });
+  }
+
+  function updateVariantPhotoDrag(clientX: number, clientY: number) {
+    if (draggedPhotoIndex === null) {
+      return;
+    }
+
+    setDragPreview((current) =>
+      current
+        ? {
+            ...current,
+            x: clientX,
+            y: clientY,
+          }
+        : current,
+    );
+
+    const index = getVariantPhotoIndexFromPoint(clientX, clientY);
+
+    if (index !== null) {
+      setDragOverPhotoIndex(index);
+    }
+  }
+
+  function finishVariantPhotoDrag(clientX: number, clientY: number) {
+    if (draggedPhotoIndex === null) {
+      return;
+    }
+
+    const dropIndex = getVariantPhotoIndexFromPoint(clientX, clientY);
+    const finalDropIndex = dropIndex ?? dragOverPhotoIndex ?? draggedPhotoIndex;
+
+    reorderVariantPhoto(draggedPhotoIndex, finalDropIndex);
+
+    setPloppedPhotoIndex(finalDropIndex);
+    window.setTimeout(() => {
+      setPloppedPhotoIndex((current) => (current === finalDropIndex ? null : current));
+    }, 240);
+
+    setDraggedPhotoIndex(null);
+    setDragOverPhotoIndex(null);
+    setDragPreview(null);
+  }
+
+  function cancelVariantPhotoDrag() {
+    setDraggedPhotoIndex(null);
+    setDragOverPhotoIndex(null);
+    setDragPreview(null);
   }
 
   function goNext() {
@@ -2410,27 +2507,106 @@ function AddVariantWizard({
         <Card elevated>
           <div className="grid gap-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {imageUploads.map((upload, index) => (
-                <div
-                  className="group relative overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]"
-                  key={`${upload.fileName}-${index}`}
-                >
-                  <img alt="" className="aspect-square w-full object-cover" src={upload.dataUrl} />
-                  <button
-                    aria-label={`Remove ${upload.fileName}`}
-                    className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
-                    onClick={() => removeVariantPhoto(index)}
-                    type="button"
+              {imageUploads.map((upload, index) => {
+                const isDragging = draggedPhotoIndex === index;
+                const isDropTarget = dragOverPhotoIndex === index && draggedPhotoIndex !== null;
+                const didJustPlop = ploppedPhotoIndex === index;
+
+                return (
+                  <div
+                    className={[
+                      "group relative touch-none select-none overflow-hidden rounded-3xl border bg-[var(--bb-surface-warm)] transition",
+                      didJustPlop ? "animate-[bayblaze-photo-plop_240ms_ease-out]" : "",
+                      isDragging
+                        ? "scale-[0.92] border-[var(--bb-blaze)] opacity-25"
+                        : isDropTarget
+                          ? "border-[var(--bb-blaze)] ring-4 ring-[var(--bb-blaze-soft)]"
+                          : "border-[var(--bb-line)]",
+                    ].filter(Boolean).join(" ")}
+                    data-variant-photo-index={index}
+                    key={`${upload.fileName}-${index}`}
+                    onPointerCancel={cancelVariantPhotoDrag}
+                    onPointerDown={(event) => {
+                      if (event.pointerType !== "mouse" || event.button !== 0) {
+                        return;
+                      }
+
+                      startVariantPhotoDrag(index, event.clientX, event.clientY);
+                    }}
+                    onPointerMove={(event) => {
+                      if (event.pointerType !== "mouse") {
+                        return;
+                      }
+
+                      updateVariantPhotoDrag(event.clientX, event.clientY);
+                    }}
+                    onPointerUp={(event) => {
+                      if (event.pointerType !== "mouse") {
+                        return;
+                      }
+
+                      finishVariantPhotoDrag(event.clientX, event.clientY);
+                    }}
+                    onTouchCancel={cancelVariantPhotoDrag}
+                    onTouchEnd={(event) => {
+                      const touch = event.changedTouches[0];
+
+                      if (!touch) {
+                        cancelVariantPhotoDrag();
+                        return;
+                      }
+
+                      finishVariantPhotoDrag(touch.clientX, touch.clientY);
+                    }}
+                    onTouchMove={(event) => {
+                      const touch = event.touches[0];
+
+                      if (!touch) {
+                        return;
+                      }
+
+                      event.preventDefault();
+                      updateVariantPhotoDrag(touch.clientX, touch.clientY);
+                    }}
+                    onTouchStart={(event) => {
+                      const touch = event.touches[0];
+
+                      if (!touch) {
+                        return;
+                      }
+
+                      startVariantPhotoDrag(index, touch.clientX, touch.clientY);
+                    }}
+                    role="button"
+                    tabIndex={0}
                   >
-                    Remove
-                  </button>
-                  {upload.uploading ? (
-                    <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-muted)] shadow">
-                      Uploading
-                    </span>
-                  ) : null}
-                </div>
-              ))}
+                    <img
+                      alt=""
+                      className="aspect-square w-full touch-none select-none object-cover"
+                      draggable={false}
+                      src={upload.dataUrl}
+                    />
+                    <button
+                      aria-label={`Remove ${upload.fileName}`}
+                      className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeVariantPhoto(index);
+                      }}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onTouchStart={(event) => event.stopPropagation()}
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                    {upload.uploading ? (
+                      <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-muted)] shadow">
+                        Uploading
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
 
               <label className="grid aspect-square cursor-pointer place-items-center rounded-3xl border-2 border-dashed border-[var(--bb-line)] bg-white transition hover:border-[var(--bb-blaze)] hover:bg-[var(--bb-blaze-soft)]">
                 <span className="grid place-items-center gap-2 text-center">
@@ -2451,13 +2627,23 @@ function AddVariantWizard({
               </label>
             </div>
 
-            <p className="text-sm font-bold text-[var(--bb-muted)]">
-              Add up to 4 photos for this specific variant. These are sent with the variant create request.
-            </p>
-
             {imageError ? <InlineNotice tone="warning">{imageError}</InlineNotice> : null}
           </div>
         </Card>
+      ) : null}
+
+      {dragPreview ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed z-[9999] size-28 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl border-2 border-white bg-white shadow-2xl transition-transform duration-75"
+          style={{
+            left: dragPreview.x,
+            top: dragPreview.y,
+            transform: "translate(-50%, -50%) scale(0.82) rotate(-2deg)",
+          }}
+        >
+          <img alt="" className="h-full w-full object-cover" src={dragPreview.dataUrl} />
+        </div>
       ) : null}
 
       {currentStep === 1 ? (
