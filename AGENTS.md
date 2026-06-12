@@ -59,6 +59,13 @@ creating new primitives.
   local UX work. Demo mutations are in-memory only. When the API URL is
   configured, backend failures must surface as errors instead of silently using
   demo data.
+- BayBlaze universal account records live behind `bayblaze-api` in
+  `accounts/{uid}` and can grant the `inventory` role. Future inventory
+  sign-in should use BayBlaze account sessions from `bayblaze-api`; browser code
+  must still avoid service tokens and direct Firebase/Medusa clients.
+- `bayblaze-admin` lives at `admin.bayblaze.net` and is the operator surface for
+  account role grants, disabling accounts, age-verification test bypasses,
+  live drivers, routes, isochrone plots, and order details.
 
 ## Variant Metadata Contract
 
