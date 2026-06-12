@@ -1050,9 +1050,6 @@ function AddProductFlow({
       !handleAlreadyExists &&
       category.trim() &&
       description.trim() &&
-      specPuffs.trim() &&
-      specCapacity.trim() &&
-      specBattery.trim() &&
       variantTitle.trim() &&
       sku.trim(),
   );
@@ -1061,7 +1058,7 @@ function AddProductFlow({
     (currentStep === 0 && photosAreReady) ||
     (currentStep === 1 &&
       Boolean(title.trim() && normalizedHandle && !handleAlreadyExists && (category.trim() || (isAddingCategory && newCategory.trim())))) ||
-    (currentStep === 2 && Boolean(description.trim() && specPuffs.trim() && specCapacity.trim() && specBattery.trim())) ||
+    (currentStep === 2 && Boolean(description.trim())) ||
     (currentStep === 3 && Boolean(variantTitle.trim() && sku.trim())) ||
     (currentStep === 4 &&
       availableQuantity.trim().length > 0 &&
@@ -1383,19 +1380,19 @@ function AddProductFlow({
               </Select>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Input
-                  label="Puffs"
+                  label="Puffs (optional)"
                   onChange={(event) => setSpecPuffs(event.target.value)}
                   placeholder="9000"
                   value={specPuffs}
                 />
                 <Input
-                  label="Capacity"
+                  label="Capacity (optional)"
                   onChange={(event) => setSpecCapacity(event.target.value)}
                   placeholder="12mL"
                   value={specCapacity}
                 />
                 <Input
-                  label="Battery"
+                  label="Battery (optional)"
                   onChange={(event) => setSpecBattery(event.target.value)}
                   placeholder="650mAh"
                   value={specBattery}
@@ -1500,8 +1497,8 @@ function AddProductFlow({
                   {description.trim() || "Missing description"}
                 </p>
                 <p className="mt-2 text-sm font-bold text-[var(--bb-muted)]">
-                  Puffs: {specPuffs.trim() || "Missing"} · Capacity: {specCapacity.trim() || "Missing"} · Battery:{" "}
-                  {specBattery.trim() || "Missing"}
+                  Puffs: {specPuffs.trim() || "Not set"} · Capacity: {specCapacity.trim() || "Not set"} · Battery:{" "}
+                  {specBattery.trim() || "Not set"}
                 </p>
               </div>
 
@@ -2025,9 +2022,9 @@ function ProductDetailsCard({
           ))}
         </Select>
         <div className="grid gap-3">
-          <Input label="Puffs" onChange={(event) => setSpecPuffs(event.target.value)} value={specPuffs} />
-          <Input label="Capacity" onChange={(event) => setSpecCapacity(event.target.value)} value={specCapacity} />
-          <Input label="Battery" onChange={(event) => setSpecBattery(event.target.value)} value={specBattery} />
+          <Input label="Puffs (optional)" onChange={(event) => setSpecPuffs(event.target.value)} value={specPuffs} />
+          <Input label="Capacity (optional)" onChange={(event) => setSpecCapacity(event.target.value)} value={specCapacity} />
+          <Input label="Battery (optional)" onChange={(event) => setSpecBattery(event.target.value)} value={specBattery} />
         </div>
         <MetadataRowsEditor rows={metadataRows} onChange={setMetadataRows} />
         <Input icon={<Image size={18} aria-hidden="true" />} label="Image URL" onChange={(event) => setImageUrl(event.target.value)} placeholder="https://..." type="url" value={imageUrl} />

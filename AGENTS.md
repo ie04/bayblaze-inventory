@@ -80,9 +80,12 @@ Product description, Medusa product collection assignment, and storefront
 specification metadata are edited in the inventory product create flow and
 product editor. The inventory API snapshot includes product `description`,
 `collectionId`, `collectionTitle`, editable product `metadata`, and the
-available Medusa `collections` list. Storefront spec fields should be stored as
-product metadata keys `spec_puffs`, `spec_capacity`, and `spec_battery`; keep
-`inventoryCategory` as the product metadata bridge for BayBlaze category labels.
+available Medusa `collections` list. Storefront spec fields are optional and
+should be stored only when relevant as product metadata keys `spec_puffs`,
+`spec_capacity`, and `spec_battery`; do not require vape-specific specs for
+wraps, cones, accessories, or other products that do not have those attributes.
+Keep `inventoryCategory` as the product metadata bridge for BayBlaze category
+labels.
 The inventory Stock screen should remain the direct editor for human-friendly
 variant contract fields: variant name, SKU, brand, barcode, price, available
 quantity, stock location, and delivery vehicle. Avoid exposing raw variable
