@@ -20,6 +20,11 @@ export type InventoryVariant = {
   updatedAt: string;
 };
 
+export type InventoryProductImage = {
+  id?: string;
+  url?: string;
+};
+
 export type InventoryProduct = {
   id: string;
   collectionId?: string;
@@ -31,7 +36,10 @@ export type InventoryProduct = {
   status: ProductStatus;
   category: string;
   thumbnail?: string;
+  imageUrl?: string;
   imageUrls?: string[];
+  images?: Array<string | InventoryProductImage>;
+  productImages?: Array<string | InventoryProductImage>;
   variants: InventoryVariant[];
 };
 
