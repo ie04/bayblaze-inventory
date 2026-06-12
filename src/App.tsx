@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
+  ArrowLeft,
   Image,
   Package,
   Plus,
@@ -650,6 +651,8 @@ function ProductEditorDialog({
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
 }) {
+  const [editorMode, setEditorMode] = useState<"details" | "add-variant">("details");
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -668,16 +671,30 @@ function ProductEditorDialog({
       <div className="flex max-h-[calc(100svh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--bb-shadow-shell)] md:max-h-[calc(100svh-3rem)] md:rounded-[var(--bb-radius-shell)]">
         <header className="flex items-start justify-between gap-3 border-b border-[var(--bb-line)] px-4 py-3 md:px-5 md:py-4">
           <div className="flex min-w-0 items-start gap-3">
-            <ProductThumbnail product={product} />
+            {editorMode === "add-variant" ? (
+              <Button
+                aria-label="Back to product details"
+                onClick={() => setEditorMode("details")}
+                size="icon"
+                title="Back to product details"
+                variant="secondary"
+              >
+                <ArrowLeft size={18} aria-hidden="true" />
+              </Button>
+            ) : (
+              <ProductThumbnail product={product} />
+            )}
             <div className="min-w-0">
               <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">
-                Product editor
+                {editorMode === "add-variant" ? "Add variant" : "Product editor"}
               </p>
               <h2 className="truncate text-xl font-black text-[var(--bb-charcoal)] md:text-2xl">
                 {product.title}
               </h2>
               <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
-                {product.variants.length} variant{product.variants.length === 1 ? "" : "s"}
+                {editorMode === "add-variant"
+                  ? "Create a sellable variant with its own photos"
+                  : `${product.variants.length} variant${product.variants.length === 1 ? "" : "s"}`}
               </p>
             </div>
           </div>
@@ -686,23 +703,36 @@ function ProductEditorDialog({
           </Button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 md:px-5 md:py-5">
-          <ProductDetailsCard
-            busy={busy}
-            collections={collections}
-            product={product}
-            categoryOptions={categoryOptions}
-            vehicles={vehicles}
-            onAssignVehicle={onAssignVehicle}
-            onCreateVariant={onCreateVariant}
-            onSetState={onSetState}
-            onUpdateProductDetails={onUpdateProductDetails}
-            onDeleteProduct={() => {
-              onDeleteProduct(product.id);
-              onClose();
-            }}
-            onUpdateQuantity={onUpdateQuantity}
-            onUpdateVariantDetails={onUpdateVariantDetails}
-          />
+          {editorMode === "add-variant" ? (
+            <AddVariantWizard
+              busy={busy}
+              product={product}
+              vehicles={vehicles}
+              onCancel={() => setEditorMode("details")}
+              onCreateVariant={(draft) => {
+                onCreateVariant(product.id, draft);
+                setEditorMode("details");
+              }}
+            />
+          ) : (
+            <ProductDetailsCard
+              busy={busy}
+              collections={collections}
+              product={product}
+              categoryOptions={categoryOptions}
+              vehicles={vehicles}
+              onAddVariant={() => setEditorMode("add-variant")}
+              onAssignVehicle={onAssignVehicle}
+              onSetState={onSetState}
+              onUpdateProductDetails={onUpdateProductDetails}
+              onDeleteProduct={() => {
+                onDeleteProduct(product.id);
+                onClose();
+              }}
+              onUpdateQuantity={onUpdateQuantity}
+              onUpdateVariantDetails={onUpdateVariantDetails}
+            />
+          )}
         </div>
       </div>
     </div>,
@@ -1805,8 +1835,8 @@ function ProductDetailsCard({
   product,
   categoryOptions,
   vehicles,
+  onAddVariant,
   onAssignVehicle,
-  onCreateVariant,
   onSetState,
   onUpdateProductDetails,
   onDeleteProduct,
@@ -1818,8 +1848,8 @@ function ProductDetailsCard({
   product: InventoryProduct;
   categoryOptions: string[];
   vehicles: DeliveryVehicle[];
+  onAddVariant: () => void;
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
-  onCreateVariant: (productId: string, draft: VariantDraft) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onDeleteProduct: () => void;
@@ -1842,15 +1872,11 @@ function ProductDetailsCard({
   const [imageUrl, setImageUrl] = useState(() => getProductImageUrls(product)[0] ?? "");
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const productImageUrls = useMemo(() => getProductImageUrls(product, imageUrl), [imageUrl, product]);
+  const safeSelectedImageIndex =
+    productImageUrls.length > 0 ? Math.min(selectedImageIndex, productImageUrls.length - 1) : 0;
   const addCategoryOptionValue = "__add_category__";
   const visibleCategoryOptions =
     category && !categoryOptions.includes(category) ? [...categoryOptions, category] : categoryOptions;
-
-  useEffect(() => {
-    if (selectedImageIndex >= productImageUrls.length) {
-      setSelectedImageIndex(0);
-    }
-  }, [productImageUrls.length, selectedImageIndex]);
 
   function selectCategory(nextCategory: string) {
     if (nextCategory === addCategoryOptionValue) {
@@ -1935,7 +1961,7 @@ function ProductDetailsCard({
         <ProductImageBrowser
           imageUrls={productImageUrls}
           productTitle={product.title}
-          selectedIndex={selectedImageIndex}
+          selectedIndex={safeSelectedImageIndex}
           onSelect={setSelectedImageIndex}
         />
 
@@ -2042,14 +2068,10 @@ function ProductDetailsCard({
         </summary>
 
         <div className="mt-4 space-y-4">
-          <CreateVariantCard
-            busy={busy}
-            productId={product.id}
-            products={[product]}
-            vehicles={vehicles}
-            onCreateVariant={onCreateVariant}
-            onProductChange={() => undefined}
-          />
+          <Button fullWidth onClick={onAddVariant} type="button">
+            <Plus size={18} aria-hidden="true" />
+            Add variant
+          </Button>
 
           {product.variants.length === 0 ? (
             <EmptyState title="No variants yet">
@@ -2177,120 +2199,390 @@ function ProductThumbnail({ product }: { product: InventoryProduct }) {
   );
 }
 
-function CreateVariantCard({
+function AddVariantWizard({
   busy,
-  productId,
-  products,
+  product,
   vehicles,
+  onCancel,
   onCreateVariant,
-  onProductChange,
 }: {
   busy: boolean;
-  productId: string;
-  products: InventoryProduct[];
+  product: InventoryProduct;
   vehicles: DeliveryVehicle[];
-  onCreateVariant: (productId: string, draft: VariantDraft) => void;
-  onProductChange: (productId: string) => void;
+  onCancel: () => void;
+  onCreateVariant: (draft: VariantDraft) => void;
 }) {
-  const [draft, setDraft] = useState<VariantDraft>({
-    inventoryState: "IN_WAREHOUSE",
-    priceCents: 0,
-    quantity: 0,
-    sku: "",
-    title: "",
-  });
+  const [currentStep, setCurrentStep] = useState(0);
+  const [imageUploads, setImageUploads] = useState<Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }>>([]);
+  const removedImageUploadsRef = useRef<Set<ProductImageUploadDraft>>(new Set());
+  const [imageError, setImageError] = useState("");
+  const [title, setTitle] = useState("");
+  const [sku, setSku] = useState("");
+  const [brand, setBrand] = useState("");
+  const [barcode, setBarcode] = useState("");
   const [price, setPrice] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [inventoryState, setInventoryState] = useState<InventoryState>("IN_WAREHOUSE");
+  const [vehicleId, setVehicleId] = useState("");
 
-  function update<K extends keyof VariantDraft>(key: K, value: VariantDraft[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
+  const steps = ["Variant images", "Variant data", "Quantity and location", "Review"];
+  const isFirstStep = currentStep === 0;
+  const isLastStep = currentStep === steps.length - 1;
+  const quantityNumber = Number(quantity || "0");
+  const photosAreReady = imageUploads.every((upload) => !upload.uploading && upload.uploadedUrl);
+  const activeVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+  const canSubmit = Boolean(
+    title.trim() &&
+      sku.trim() &&
+      photosAreReady &&
+      quantity.trim().length > 0 &&
+      Number.isFinite(quantityNumber) &&
+      quantityNumber >= 0 &&
+      (inventoryState === "IN_WAREHOUSE" || vehicleId),
+  );
+  const canContinue =
+    (currentStep === 0 && photosAreReady) ||
+    (currentStep === 1 && Boolean(title.trim() && sku.trim())) ||
+    (currentStep === 2 &&
+      quantity.trim().length > 0 &&
+      Number.isFinite(quantityNumber) &&
+      quantityNumber >= 0 &&
+      (inventoryState === "IN_WAREHOUSE" || Boolean(vehicleId))) ||
+    (isLastStep && canSubmit);
+
+  async function handleVariantPhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+
+    if (!files.length) {
+      return;
+    }
+
+    const maxOriginalBytes = 30 * 1024 * 1024;
+    const maxPhotos = 4;
+
+    if (imageUploads.length + files.length > maxPhotos) {
+      setImageError(`Add up to ${maxPhotos} variant photos.`);
+      event.target.value = "";
+      return;
+    }
+
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        setImageError("Choose image files only.");
+        event.target.value = "";
+        return;
+      }
+
+      if (file.size > maxOriginalBytes) {
+        setImageError("Choose images under 30 MB.");
+        event.target.value = "";
+        return;
+      }
+    }
+
+    const nextUploads: Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }> = [];
+
+    for (const file of files) {
+      try {
+        const dataUrl = await compressImageFileToDataUrl(file);
+        nextUploads.push({
+          dataUrl,
+          fileName: toCompressedImageFileName(file.name || "variant-photo"),
+          mimeType: "image/jpeg",
+          uploading: true,
+        });
+      } catch {
+        setImageError("Unable to process one of those images. Try another photo.");
+        event.target.value = "";
+        return;
+      }
+    }
+
+    setImageUploads((current) => [...current, ...nextUploads].slice(0, maxPhotos));
+    setImageError("");
+    event.target.value = "";
+
+    for (const imageUpload of nextUploads) {
+      try {
+        const uploadedUrl = await uploadProductImage(imageUpload);
+
+        if (removedImageUploadsRef.current.has(imageUpload)) {
+          removedImageUploadsRef.current.delete(imageUpload);
+          void deleteUploadedProductImage(uploadedUrl).catch(() => {
+            setImageError("Image was removed, but Medusa cleanup failed. It will be cleaned up later.");
+          });
+          continue;
+        }
+
+        setImageUploads((current) =>
+          current.map((item) =>
+            item === imageUpload
+              ? {
+                  ...item,
+                  uploadedUrl,
+                  uploading: false,
+                }
+              : item,
+          ),
+        );
+      } catch (caught) {
+        removedImageUploadsRef.current.delete(imageUpload);
+        setImageUploads((current) =>
+          current.map((item) =>
+            item === imageUpload
+              ? {
+                  ...item,
+                  uploading: false,
+                }
+              : item,
+          ),
+        );
+        setImageError(caught instanceof Error ? caught.message : "Variant image upload failed.");
+      }
+    }
+  }
+
+  function removeVariantPhoto(indexToRemove: number) {
+    const uploadToRemove = imageUploads[indexToRemove];
+
+    if (uploadToRemove?.uploadedUrl) {
+      void deleteUploadedProductImage(uploadToRemove.uploadedUrl).catch(() => {
+        setImageError("Unable to delete that temporary image from Medusa. It will be cleaned up later.");
+      });
+    } else if (uploadToRemove?.uploading) {
+      removedImageUploadsRef.current.add(uploadToRemove);
+    }
+
+    setImageUploads((current) => current.filter((_, index) => index !== indexToRemove));
+    setImageError("");
+  }
+
+  function goNext() {
+    if (!canContinue || isLastStep) {
+      return;
+    }
+
+    setCurrentStep((step) => Math.min(step + 1, steps.length - 1));
+  }
+
+  function goBack() {
+    setCurrentStep((step) => Math.max(step - 1, 0));
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!productId || !draft.title.trim() || !draft.sku.trim()) {
+
+    if (!canSubmit) {
       return;
     }
 
-    onCreateVariant(productId, {
-      ...draft,
-      barcode: draft.barcode?.trim() || undefined,
-      brand: draft.brand?.trim() || undefined,
+    onCreateVariant({
+      barcode: barcode.trim() || undefined,
+      brand: brand.trim() || undefined,
+      imageUrls: imageUploads.map((upload) => upload.uploadedUrl).filter((url): url is string => Boolean(url)),
+      inventoryState,
       priceCents: dollarsToCents(price),
-      sku: draft.sku.trim(),
-      title: draft.title.trim(),
-      vehicleId: draft.inventoryState === "ON_VEHICLE" ? draft.vehicleId : undefined,
+      quantity: quantityNumber,
+      sku: sku.trim(),
+      title: title.trim(),
+      vehicleId: inventoryState === "ON_VEHICLE" ? vehicleId || undefined : undefined,
     });
-    setDraft({
-      inventoryState: "IN_WAREHOUSE",
-      priceCents: 0,
-      quantity: 0,
-      sku: "",
-      title: "",
-    });
-    setPrice("");
   }
 
   return (
-    <Card>
-      <SectionHeader title="Create variant" />
-      <form className="mt-4 space-y-3" onSubmit={submit}>
-        <Select label="Product" onChange={(event) => onProductChange(event.target.value)} value={productId}>
-          {products.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.title}
-            </option>
-          ))}
-        </Select>
-        <Input label="Variant" onChange={(event) => update("title", event.target.value)} placeholder="Blue Razz Ice" value={draft.title} />
-        <Input label="SKU" onChange={(event) => update("sku", event.target.value)} value={draft.sku} />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Input label="Brand" onChange={(event) => update("brand", event.target.value)} value={draft.brand ?? ""} />
-          <Input label="Barcode" onChange={(event) => update("barcode", event.target.value)} value={draft.barcode ?? ""} />
+    <form className="space-y-4 pb-2" onSubmit={submit}>
+      <Card elevated>
+        <div className="flex items-center justify-between gap-3">
+          <StepHeading step={String(currentStep + 1)} title={steps[currentStep]} />
+          <Badge tone="neutral">
+            {currentStep + 1} / {steps.length}
+          </Badge>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Input
-            label="Price"
-            min={0}
-            onChange={(event) => setPrice(event.target.value)}
-            placeholder="24.99"
-            step="0.01"
-            type="number"
-            value={price}
-          />
-          <Input
-            label="Quantity"
-            min={0}
-            onChange={(event) => update("quantity", Number(event.target.value))}
-            type="number"
-            value={draft.quantity}
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--bb-surface-warm)]">
+          <div
+            className="h-full rounded-full bg-[var(--bb-blaze)] transition-all"
+            style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
           />
         </div>
-        <Select
-          label="Inventory state"
-          onChange={(event) => update("inventoryState", event.target.value as InventoryState)}
-          value={draft.inventoryState}
-        >
-          <option value="IN_WAREHOUSE">In warehouse</option>
-          <option value="ON_VEHICLE">On vehicle</option>
-        </Select>
-        {draft.inventoryState === "ON_VEHICLE" ? (
-          <Select label="Vehicle" onChange={(event) => update("vehicleId", event.target.value)} value={draft.vehicleId ?? ""}>
-            <option value="">Choose vehicle</option>
-            {vehicles
-              .filter((vehicle) => vehicle.id !== "warehouse")
-              .map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.label}
-                </option>
+      </Card>
+
+      {currentStep === 0 ? (
+        <Card elevated>
+          <div className="grid gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {imageUploads.map((upload, index) => (
+                <div
+                  className="group relative overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]"
+                  key={`${upload.fileName}-${index}`}
+                >
+                  <img alt="" className="aspect-square w-full object-cover" src={upload.dataUrl} />
+                  <button
+                    aria-label={`Remove ${upload.fileName}`}
+                    className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
+                    onClick={() => removeVariantPhoto(index)}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                  {upload.uploading ? (
+                    <span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-muted)] shadow">
+                      Uploading
+                    </span>
+                  ) : null}
+                </div>
               ))}
-          </Select>
-        ) : null}
-        <Button fullWidth loading={busy} type="submit">
-          <Plus size={18} aria-hidden="true" />
-          Add variant
-        </Button>
-      </form>
-    </Card>
+
+              <label className="grid aspect-square cursor-pointer place-items-center rounded-3xl border-2 border-dashed border-[var(--bb-line)] bg-white transition hover:border-[var(--bb-blaze)] hover:bg-[var(--bb-blaze-soft)]">
+                <span className="grid place-items-center gap-2 text-center">
+                  <span className="grid size-12 place-items-center rounded-full bg-[var(--bb-blaze-soft)] text-[var(--bb-blaze)]">
+                    <Plus size={28} aria-hidden="true" />
+                  </span>
+                  <span className="text-xs font-black uppercase text-[var(--bb-muted)]">
+                    Add Photo
+                  </span>
+                </span>
+                <input
+                  accept="image/*"
+                  className="sr-only"
+                  multiple
+                  onChange={handleVariantPhotoChange}
+                  type="file"
+                />
+              </label>
+            </div>
+
+            <p className="text-sm font-bold text-[var(--bb-muted)]">
+              Add up to 4 photos for this specific variant. These are sent with the variant create request.
+            </p>
+
+            {imageError ? <InlineNotice tone="warning">{imageError}</InlineNotice> : null}
+          </div>
+        </Card>
+      ) : null}
+
+      {currentStep === 1 ? (
+        <Card elevated>
+          <div className="grid gap-3">
+            <Input label="Variant name" onChange={(event) => setTitle(event.target.value)} placeholder="Blue Razz Ice" value={title} />
+            <Input label="SKU" onChange={(event) => setSku(event.target.value)} placeholder="RAZ-TN9000-BRI" value={sku} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input label="Brand" onChange={(event) => setBrand(event.target.value)} value={brand} />
+              <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
+            </div>
+            <Input
+              label="Price"
+              min={0}
+              onChange={(event) => setPrice(event.target.value)}
+              placeholder="24.99"
+              step="0.01"
+              type="number"
+              value={price}
+            />
+          </div>
+        </Card>
+      ) : null}
+
+      {currentStep === 2 ? (
+        <Card elevated>
+          <div className="grid gap-3">
+            <Input
+              label="Available quantity"
+              min={0}
+              onChange={(event) => setQuantity(event.target.value)}
+              placeholder="0"
+              type="number"
+              value={quantity}
+            />
+            <Select
+              label="Stock location"
+              onChange={(event) => {
+                const nextState = event.target.value as InventoryState;
+                setInventoryState(nextState);
+
+                if (nextState === "IN_WAREHOUSE") {
+                  setVehicleId("");
+                }
+              }}
+              value={inventoryState}
+            >
+              <option value="IN_WAREHOUSE">In warehouse</option>
+              <option value="ON_VEHICLE">On vehicle</option>
+            </Select>
+            {inventoryState === "ON_VEHICLE" ? (
+              <Select label="Delivery vehicle" onChange={(event) => setVehicleId(event.target.value)} value={vehicleId}>
+                <option value="">Choose vehicle</option>
+                {vehicles
+                  .filter((vehicle) => vehicle.id !== "warehouse")
+                  .map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.label}
+                    </option>
+                  ))}
+              </Select>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
+      {currentStep === 3 ? (
+        <Card elevated>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">{product.title}</p>
+              <h3 className="mt-1 text-2xl font-black text-[var(--bb-charcoal)]">
+                {title.trim() || "Untitled variant"}
+              </h3>
+              <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                SKU: {sku.trim() || "Missing"} · Price: {price.trim() ? `$${price.trim()}` : "$0.00"}
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {imageUploads.slice(0, 3).map((upload, index) => (
+                <img
+                  alt=""
+                  className="aspect-square rounded-3xl border border-[var(--bb-line)] object-cover"
+                  key={`${upload.fileName}-review-${index}`}
+                  src={upload.dataUrl}
+                />
+              ))}
+            </div>
+            <p className="text-sm font-bold text-[var(--bb-muted)]">
+              {quantityNumber} unit{quantityNumber === 1 ? "" : "s"} ·{" "}
+              {inventoryState === "ON_VEHICLE" ? activeVehicle?.label ?? "Vehicle not selected" : "Warehouse"}
+            </p>
+            {!canSubmit ? (
+              <InlineNotice tone="warning">
+                Complete variant photos, name, SKU, quantity, and stock location before adding this variant.
+              </InlineNotice>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
+      <div className="sticky bottom-0 z-40 rounded-3xl border border-[var(--bb-line)] bg-white/95 p-3 shadow-[0_-12px_30px_rgba(17,24,39,0.08)] backdrop-blur">
+        <div className="grid grid-cols-2 gap-2">
+          {isFirstStep ? (
+            <Button fullWidth disabled={busy} onClick={onCancel} type="button" variant="secondary">
+              Cancel
+            </Button>
+          ) : (
+            <Button fullWidth disabled={busy} onClick={goBack} type="button" variant="secondary">
+              Back
+            </Button>
+          )}
+          {isLastStep ? (
+            <Button fullWidth disabled={!canContinue} loading={busy} type="submit">
+              <Plus size={18} aria-hidden="true" />
+              Add variant
+            </Button>
+          ) : (
+            <Button fullWidth disabled={!canContinue || busy} onClick={goNext} type="button">
+              Continue
+            </Button>
+          )}
+        </div>
+      </div>
+    </form>
   );
 }
 
@@ -2444,13 +2736,7 @@ function getInventoryImageSrc(value: string) {
     return "";
   }
 
-  let pathname = "";
-
-  try {
-    pathname = new URL(imageUrl).pathname;
-  } catch {
-    pathname = imageUrl;
-  }
+  const pathname = getImagePathname(imageUrl);
 
   const match = pathname.match(/\/bayblaze\/inventory-images\/([^/?#]+)$/);
 
@@ -2459,6 +2745,14 @@ function getInventoryImageSrc(value: string) {
   }
 
   return `/api/inventory-image?filename=${encodeURIComponent(match[1])}`;
+}
+
+function getImagePathname(imageUrl: string) {
+  try {
+    return new URL(imageUrl).pathname;
+  } catch {
+    return imageUrl;
+  }
 }
 
 function flattenVariants(products: InventoryProduct[]) {

@@ -161,6 +161,8 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
     variant.title = draft.title ?? variant.title;
     variant.sku = draft.sku ?? variant.sku;
     variant.priceCents = draft.priceCents ?? variant.priceCents;
+    variant.imageUrl = draft.imageUrls?.[0] ?? draft.imageUploads?.[0]?.dataUrl ?? draft.imageUrl;
+    variant.imageUrls = draft.imageUrls ?? draft.imageUploads?.map((upload) => upload.dataUrl) ?? variant.imageUrls;
     variant.metadata = {
       ...variant.metadata,
       barcode: draft.barcode ?? variant.metadata.barcode,
@@ -242,6 +244,8 @@ function toDemoVariant(
     title: draft.title,
     sku: draft.sku,
     priceCents: draft.priceCents,
+    imageUrl: draft.imageUrls?.[0] ?? draft.imageUploads?.[0]?.dataUrl ?? draft.imageUrl,
+    imageUrls: draft.imageUrls ?? draft.imageUploads?.map((upload) => upload.dataUrl) ?? (draft.imageUrl ? [draft.imageUrl] : undefined),
     metadata: {
       inventoryState: draft.inventoryState,
       availableQuantity: draft.quantity,

@@ -16,6 +16,9 @@ export type InventoryVariant = {
   title: string;
   sku: string;
   priceCents: number;
+  imageUrl?: string;
+  imageUrls?: string[];
+  images?: Array<string | InventoryProductImage>;
   metadata: VariantMetadata;
   updatedAt: string;
 };
@@ -89,6 +92,9 @@ export type ProductDraft = {
 export type VariantDraft = {
   barcode?: string;
   brand?: string;
+  imageUrl?: string;
+  imageUrls?: string[];
+  imageUploads?: ProductImageUploadDraft[];
   inventoryState: InventoryState;
   priceCents: number;
   quantity: number;
