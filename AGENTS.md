@@ -28,8 +28,9 @@ creating new primitives.
 
 ## Source Of Truth Boundary
 
-- `bayblaze-medusa` remains the source of truth for products, variants, orders,
-  fulfillment, payment state, and inventory.
+- Embedded Medusa under `bayblaze-api/medusa` remains the source of truth for
+  products, variants, orders, fulfillment, payment state, and inventory. The old
+  standalone `bayblaze-medusa` repo is retired.
 - The inventory PWA must not become a separate commerce database.
 - Browser code must not expose Medusa admin tokens or service tokens.
 - The PWA calls a same-origin or configured inventory API boundary through
