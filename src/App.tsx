@@ -1839,7 +1839,7 @@ function ProductDetailsCard({
   );
   const [newCategory, setNewCategory] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [imageUrl, setImageUrl] = useState(product.thumbnail ?? product.imageUrls?.[0] ?? "");
+  const [imageUrl, setImageUrl] = useState(() => getProductImageUrls(product)[0] ?? "");
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const productImageUrls = useMemo(() => getProductImageUrls(product, imageUrl), [imageUrl, product]);
   const addCategoryOptionValue = "__add_category__";
