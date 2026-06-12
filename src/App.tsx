@@ -553,7 +553,7 @@ function VehicleStockGroup({
               className="grid gap-3 rounded-2xl border border-[var(--bb-line)] bg-white p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
               key={variant.id}
             >
-              <VariantThumbnail imageUrl={getVariantThumbnailUrl(variant)} compact />
+              <VariantThumbnail imageUrl={getVariantMainImageUrl(variant)} compact />
               <div className="min-w-0">
                 <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">
                   {variant.title}
@@ -628,13 +628,13 @@ function groupVehicleVariants(variants: InventoryVariant[]) {
         currentGroup.variants.push(variant);
 
         if (!currentGroup.thumbnailUrl) {
-          currentGroup.thumbnailUrl = getVariantThumbnailUrl(variant);
+          currentGroup.thumbnailUrl = getVariantMainImageUrl(variant);
         }
       } else {
         groups.set(groupKey, {
           productId: groupKey,
           productTitle: variant.productTitle,
-          thumbnailUrl: getVariantThumbnailUrl(variant),
+          thumbnailUrl: getVariantMainImageUrl(variant),
           totalUnits: variant.metadata.availableQuantity,
           variants: [variant],
         });
@@ -2323,10 +2323,10 @@ function getProductImageUrls(product: InventoryProduct, imageOverride = "") {
   );
 }
 
-function getVariantThumbnailUrl(variant: InventoryVariant) {
+function getVariantMainImageUrl(variant: InventoryVariant) {
   const urls = [
-    ...(variant.imageUrls ?? []),
     variant.imageUrl,
+    ...(variant.imageUrls ?? []),
     ...(variant.images ?? []).map((image) => (typeof image === "string" ? image : image.url ?? "")),
   ];
 
