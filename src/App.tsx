@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent,
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
+  ChevronDown,
   Image,
   Package,
   Plus,
@@ -467,33 +468,10 @@ function VehiclesView({
                     {assigned.length === 0 ? (
                       <InlineNotice tone="warning">No variants are assigned to this vehicle.</InlineNotice>
                     ) : (
-                      assigned.map((variant) => (
-                        <div
-                          key={variant.id}
-                          className="grid gap-3 rounded-2xl bg-[var(--bb-surface-warm)] p-3 sm:flex sm:items-center sm:justify-between"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">
-                              {variant.productTitle}
-                            </p>
-                            <p className="truncate text-xs font-bold text-[var(--bb-muted)]">
-                              {variant.title} - {variant.sku}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-start">
-                            <Badge tone="brand">{variant.metadata.availableQuantity} units</Badge>
-                            <Button
-                              aria-label={`Move ${variant.title} to warehouse`}
-                              onClick={() => onAssignVehicle(variant.id, "warehouse")}
-                              size="icon"
-                              title="Move to warehouse"
-                              variant="secondary"
-                            >
-                              <Warehouse size={17} aria-hidden="true" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))
+                      <VehicleStockGroups
+                        variants={assigned}
+                        onMoveToWarehouse={(variantId) => onAssignVehicle(variantId, "warehouse")}
+                      />
                     )}
                   </div>
                 </div>
@@ -504,6 +482,166 @@ function VehiclesView({
       )}
     </>
   );
+}
+
+function VehicleStockGroups({
+  variants,
+  onMoveToWarehouse,
+}: {
+  variants: InventoryVariant[];
+  onMoveToWarehouse: (variantId: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      {groupVehicleVariants(variants).map((group) => (
+        <VehicleStockGroup
+          group={group}
+          key={group.productId}
+          onMoveToWarehouse={onMoveToWarehouse}
+        />
+      ))}
+    </div>
+  );
+}
+
+type VehicleVariantGroup = {
+  productId: string;
+  productTitle: string;
+  thumbnailUrl: string;
+  totalUnits: number;
+  variants: InventoryVariant[];
+};
+
+function VehicleStockGroup({
+  group,
+  onMoveToWarehouse,
+}: {
+  group: VehicleVariantGroup;
+  onMoveToWarehouse: (variantId: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const variantCount = group.variants.length;
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]">
+      <button
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 p-3 text-left"
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <VariantThumbnail imageUrl={group.thumbnailUrl} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-black text-[var(--bb-charcoal)]">
+            {group.productTitle}
+          </span>
+          <span className="mt-0.5 block truncate text-xs font-bold text-[var(--bb-muted)]">
+            {variantCount} variant{variantCount === 1 ? "" : "s"} · {group.totalUnits} units
+          </span>
+        </span>
+        <Badge tone="brand">{group.totalUnits} units</Badge>
+        <ChevronDown
+          aria-hidden="true"
+          className={`size-5 shrink-0 text-[var(--bb-muted)] transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open ? (
+        <div className="space-y-2 border-t border-[var(--bb-line)] bg-white p-3">
+          {group.variants.map((variant) => (
+            <div
+              className="grid gap-3 rounded-2xl border border-[var(--bb-line)] bg-white p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center"
+              key={variant.id}
+            >
+              <VariantThumbnail imageUrl={getVariantThumbnailUrl(variant)} compact />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black text-[var(--bb-charcoal)]">
+                  {variant.title}
+                </p>
+                <p className="truncate text-xs font-bold text-[var(--bb-muted)]">
+                  {variant.sku}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center justify-between gap-2 sm:justify-start">
+                <Badge tone="brand">{variant.metadata.availableQuantity} units</Badge>
+                <Button
+                  aria-label={`Move ${variant.title} to warehouse`}
+                  onClick={() => onMoveToWarehouse(variant.id)}
+                  size="icon"
+                  title="Move to warehouse"
+                  variant="secondary"
+                >
+                  <Warehouse size={17} aria-hidden="true" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function VariantThumbnail({
+  compact = false,
+  imageUrl,
+}: {
+  compact?: boolean;
+  imageUrl: string;
+}) {
+  return (
+    <span
+      className={`grid shrink-0 place-items-center overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-white text-[var(--bb-muted)] ${
+        compact ? "size-12" : "size-14"
+      }`}
+    >
+      {imageUrl ? (
+        <img alt="" className="size-full object-cover" src={getInventoryImageSrc(imageUrl)} />
+      ) : (
+        <Image size={compact ? 18 : 21} aria-hidden="true" />
+      )}
+    </span>
+  );
+}
+
+function groupVehicleVariants(variants: InventoryVariant[]) {
+  const groups = new Map<string, VehicleVariantGroup>();
+
+  [...variants]
+    .sort((first, second) => {
+      const productCompare = first.productTitle.localeCompare(second.productTitle, undefined, {
+        sensitivity: "base",
+      });
+
+      if (productCompare !== 0) {
+        return productCompare;
+      }
+
+      return first.title.localeCompare(second.title, undefined, { sensitivity: "base" });
+    })
+    .forEach((variant) => {
+      const groupKey = variant.productId || variant.productTitle;
+      const currentGroup = groups.get(groupKey);
+
+      if (currentGroup) {
+        currentGroup.totalUnits += variant.metadata.availableQuantity;
+        currentGroup.variants.push(variant);
+
+        if (!currentGroup.thumbnailUrl) {
+          currentGroup.thumbnailUrl = getVariantThumbnailUrl(variant);
+        }
+      } else {
+        groups.set(groupKey, {
+          productId: groupKey,
+          productTitle: variant.productTitle,
+          thumbnailUrl: getVariantThumbnailUrl(variant),
+          totalUnits: variant.metadata.availableQuantity,
+          variants: [variant],
+        });
+      }
+    });
+
+  return Array.from(groups.values());
 }
 
 function VehicleAssignmentControl({
@@ -2182,6 +2320,20 @@ function getProductImageUrls(product: InventoryProduct, imageOverride = "") {
         .map((url) => (typeof url === "string" ? url.trim() : ""))
         .filter(Boolean),
     ),
+  );
+}
+
+function getVariantThumbnailUrl(variant: InventoryVariant) {
+  const urls = [
+    ...(variant.imageUrls ?? []),
+    variant.imageUrl,
+    ...(variant.images ?? []).map((image) => (typeof image === "string" ? image : image.url ?? "")),
+  ];
+
+  return (
+    urls
+      .map((url) => (typeof url === "string" ? url.trim() : ""))
+      .find(Boolean) ?? ""
   );
 }
 
