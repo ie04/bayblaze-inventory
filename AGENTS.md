@@ -61,9 +61,18 @@ creating new primitives.
   configured, backend failures must surface as errors instead of silently using
   demo data.
 - BayBlaze universal account records live behind `bayblaze-api` in
-  `accounts/{uid}` and can grant the `inventory` role. Future inventory
-  sign-in should use BayBlaze account sessions from `bayblaze-api`; browser code
-  must still avoid service tokens and direct Firebase/Medusa clients.
+  `accounts/{uid}` and can grant the `inventory` role. Inventory sign-in uses
+  the universal BayBlaze account routes: `POST /v1/auth/login`,
+  `POST /v1/auth/google/start`, and `POST /v1/auth/google/callback`. The
+  browser stores the returned session only after verifying the account has the
+  `employee` badge plus the `inventory` role.
+- The Vercel `/api/inventory` and `/api/inventory-image` boundaries must verify
+  the browser bearer token through `bayblaze-api` `GET /v1/auth/me` and require
+  `employee` + `inventory` before using `BAYBLAZE_API_SERVICE_TOKEN` for
+  upstream inventory calls.
+- Google OAuth redirect URI for the inventory PWA:
+  `https://inventory.bayblaze.net/auth/google/callback` in production and the
+  local Vite callback URL when testing locally.
 - `bayblaze-admin` lives at `admin.bayblaze.net` and is the operator surface for
   account role grants, disabling accounts, age-verification test bypasses,
   live drivers, routes, isochrone plots, and order details.

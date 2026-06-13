@@ -4,9 +4,13 @@ import {
   ArrowLeft,
   ChevronDown,
   Image,
+  KeyRound,
+  LogOut,
+  Mail,
   Package,
   Plus,
   RefreshCw,
+  ShieldCheck,
   Trash2,
   Truck,
   Warehouse,
@@ -30,6 +34,14 @@ import {
   Textarea,
 } from "./components/ui";
 import { loadInventory, mutateInventory } from "./lib/inventoryApi";
+import {
+  clearInventorySession,
+  completeInventoryGoogleLogin,
+  getInventorySession,
+  loginInventory,
+  startInventoryGoogleLogin,
+  type InventorySession,
+} from "./lib/inventoryAuth";
 import type {
   DeliveryVehicle,
   InventoryCollection,
@@ -65,11 +77,20 @@ const views: Array<{ id: View; icon: ReactNode; label: string }> = [
 ];
 
 function App() {
+  const [session, setSession] = useState<InventorySession | null>(() => getInventorySession());
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
   const [activeView, setActiveView] = useState<View>("products");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  function applySession(nextSession: InventorySession | null) {
+    setSession(nextSession);
+    if (!nextSession) {
+      clearInventorySession();
+      setSnapshot(null);
+    }
+  }
 
   async function refreshInventory() {
     setError("");
@@ -99,9 +120,13 @@ function App() {
   }
 
   useEffect(() => {
+    if (!session) {
+      return;
+    }
+
     const timer = window.setTimeout(() => void refreshInventory(), 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [session]);
 
   const variants = useMemo(() => flattenVariants(snapshot?.products ?? []), [snapshot]);
 
@@ -143,6 +168,10 @@ function App() {
     />
   ) : null;
 
+  if (!session) {
+    return <LoginScreen onAuthenticated={applySession} />;
+  }
+
   return (
     <AppShell
       fullScreen
@@ -171,6 +200,15 @@ function App() {
                 variant="secondary"
               >
                 {!loading ? <RefreshCw size={18} aria-hidden="true" /> : null}
+              </Button>
+              <Button
+                aria-label="Sign out"
+                onClick={() => applySession(null)}
+                size="icon"
+                title="Sign out"
+                variant="secondary"
+              >
+                <LogOut size={18} aria-hidden="true" />
               </Button>
             </div>
           </div>
@@ -238,6 +276,128 @@ function App() {
         </section>
       </div>
     </AppShell>
+  );
+}
+
+function LoginScreen({ onAuthenticated }: { onAuthenticated: (session: InventorySession) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(() => window.location.pathname === "/auth/google/callback");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (window.location.pathname !== "/auth/google/callback") {
+      return;
+    }
+
+    completeInventoryGoogleLogin(new URLSearchParams(window.location.search))
+      .then((session) => {
+        window.history.replaceState({}, "", "/");
+        onAuthenticated(session);
+      })
+      .catch((caught) => {
+        window.history.replaceState({}, "", "/");
+        setError(caught instanceof Error ? caught.message : "Google sign-in failed.");
+      })
+      .finally(() => setGoogleLoading(false));
+  }, [onAuthenticated]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      onAuthenticated(await loginInventory(email, password));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sign-in failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loginWithGoogle() {
+    setGoogleLoading(true);
+    setError("");
+
+    try {
+      await startInventoryGoogleLogin();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Google sign-in failed.");
+      setGoogleLoading(false);
+    }
+  }
+
+  return (
+    <AppShell login>
+      <div className="grid min-h-svh place-items-center px-4 py-8">
+        <Card elevated className="w-full max-w-md space-y-5">
+          <div className="flex items-center gap-3">
+            <span className="grid size-12 place-items-center rounded-[20px] bg-[var(--bb-charcoal)] text-[var(--bb-blaze)]">
+              <ShieldCheck size={26} aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-xs font-black uppercase text-[var(--bb-blaze)]">BayBlaze</p>
+              <h1 className="text-3xl font-black uppercase leading-tight">Inventory</h1>
+            </div>
+          </div>
+          <p className="text-sm font-semibold leading-6 text-[var(--bb-muted)]">
+            Use a BayBlaze employee account with the inventory role.
+          </p>
+
+          {error ? <ErrorState>{error}</ErrorState> : null}
+
+          <Button fullWidth loading={googleLoading} onClick={() => void loginWithGoogle()} variant="secondary">
+            <GoogleIcon />
+            Continue with Google
+          </Button>
+
+          <div className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.16em] text-[var(--bb-muted)]">
+            <span className="h-px flex-1 bg-[var(--bb-line)]" />
+            <span>Email</span>
+            <span className="h-px flex-1 bg-[var(--bb-line)]" />
+          </div>
+
+          <form className="space-y-4" onSubmit={submit}>
+            <Input
+              autoComplete="email"
+              icon={<Mail size={18} aria-hidden="true" />}
+              label="Email"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="inventory@example.com"
+              required
+              type="email"
+              value={email}
+            />
+            <Input
+              autoComplete="current-password"
+              icon={<KeyRound size={18} aria-hidden="true" />}
+              label="Password"
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Password"
+              required
+              type="password"
+              value={password}
+            />
+            <Button fullWidth loading={loading} type="submit">
+              Sign in
+            </Button>
+          </form>
+        </Card>
+      </div>
+    </AppShell>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-5 place-items-center rounded-full border border-[var(--bb-line)] bg-white text-xs font-black text-[var(--bb-charcoal)]"
+    >
+      G
+    </span>
   );
 }
 

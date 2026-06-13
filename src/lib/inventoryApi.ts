@@ -9,6 +9,7 @@ import type {
   VariantDraft,
   VariantUpdateDraft,
 } from "./types";
+import { getInventorySessionToken } from "./inventoryAuth";
 
 const apiBaseUrl = import.meta.env.VITE_BAYBLAZE_INVENTORY_API_URL?.toString().replace(/\/$/, "");
 
@@ -48,6 +49,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     credentials: "include",
     headers: {
+      ...(getInventorySessionToken() ? { Authorization: `Bearer ${getInventorySessionToken()}` } : {}),
       "Content-Type": "application/json",
     },
     ...init,

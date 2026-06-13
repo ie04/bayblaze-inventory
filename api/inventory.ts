@@ -3,6 +3,7 @@ import { getFirestore } from "firebase-admin/firestore";
 
 type VercelRequest = {
   body?: unknown;
+  headers?: Record<string, string | string[] | undefined>;
   method?: string;
 };
 
@@ -43,6 +44,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ message: "Method not allowed." });
   }
 
+  const authResult = await verifyInventoryAccount(req);
+
+  if (!authResult.ok) {
+    return res.status(authResult.status).json({ message: authResult.message });
+  }
+
   let upstreamResponse: Response;
 
   try {
@@ -71,6 +78,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(upstreamResponse.status).json(responseBody);
+}
+
+async function verifyInventoryAccount(req: VercelRequest) {
+  const token = readBearerToken(req.headers?.authorization);
+
+  if (!token) {
+    return {
+      ok: false as const,
+      message: "BayBlaze inventory sign-in is required.",
+      status: 401,
+    };
+  }
+
+  const response = await fetch(`${bayblazeApiUrl}/v1/auth/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }).catch(() => null);
+
+  if (!response) {
+    return {
+      ok: false as const,
+      message: "BayBlaze account could not be verified.",
+      status: 502,
+    };
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    account?: {
+      badges?: string[];
+      roles?: string[];
+    };
+    message?: string;
+  };
+
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      message: payload.message || "BayBlaze account session is not valid.",
+      status: response.status,
+    };
+  }
+
+  if (!payload.account?.badges?.includes("employee") || !payload.account.roles?.includes("inventory")) {
+    return {
+      ok: false as const,
+      message: "Inventory access is required.",
+      status: 403,
+    };
+  }
+
+  return { ok: true as const };
+}
+
+function readBearerToken(value: string | string[] | undefined) {
+  const header = Array.isArray(value) ? value[0] : value;
+
+  if (!header?.toLowerCase().startsWith("bearer ")) {
+    return "";
+  }
+
+  return header.slice("bearer ".length).trim();
 }
 
 function fetchInventoryUpstream(req: VercelRequest) {
