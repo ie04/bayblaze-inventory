@@ -56,6 +56,10 @@ creating new primitives.
   `BAYBLAZE_API_URL=<shared bayblaze-api origin>`,
   and `BAYBLAZE_API_SERVICE_TOKEN=<shared app-to-api token>`. Add Firebase Admin
   server variables as above for vehicle dropdowns.
+- The active production inventory app domain is `https://stock.bayblaze.net`.
+  Keep this origin in `bayblaze-api` production `CORS_ORIGINS` so browser auth
+  calls to `https://api.bayblaze.net` do not fail CORS preflight with
+  `Failed to fetch`.
 - When the inventory API is not configured, the app falls back to demo data for
   local UX work. Demo mutations are in-memory only. When the API URL is
   configured, backend failures must surface as errors instead of silently using
@@ -71,7 +75,7 @@ creating new primitives.
   `employee` + `inventory` before using `BAYBLAZE_API_SERVICE_TOKEN` for
   upstream inventory calls.
 - Google OAuth redirect URI for the inventory PWA:
-  `https://inventory.bayblaze.net/auth/google/callback` in production and the
+  `https://stock.bayblaze.net/auth/google/callback` in production and the
   local Vite callback URL when testing locally.
 - `bayblaze-admin` lives at `admin.bayblaze.net` and is the operator surface for
   account role grants, disabling accounts, age-verification test bypasses,
