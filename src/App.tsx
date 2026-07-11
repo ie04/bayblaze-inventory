@@ -2499,16 +2499,22 @@ function getProductMainImageUrl(product: InventoryProduct) {
 }
 
 function getVariantMainImageUrl(variant: InventoryVariant) {
+  return getVariantImageUrls(variant)[0] ?? "";
+}
+
+function getVariantImageUrls(variant: InventoryVariant) {
   const urls = [
     variant.imageUrl,
     ...(variant.imageUrls ?? []),
     ...(variant.images ?? []).map(readImageValueUrl),
   ];
 
-  return (
-    urls
-      .map((url) => (typeof url === "string" ? url.trim() : ""))
-      .find(Boolean) ?? ""
+  return Array.from(
+    new Set(
+      urls
+        .map((url) => (typeof url === "string" ? url.trim() : ""))
+        .filter(Boolean),
+    ),
   );
 }
 
@@ -3121,9 +3127,6 @@ function VariantContractCard({
   productBrand,
   variant,
   vehicles,
-  onAssignVehicle,
-  onSetState,
-  onUpdateQuantity,
   onUpdateVariantDetails,
 }: {
   busy: boolean;
@@ -3145,14 +3148,148 @@ function VariantContractCard({
     variant.metadata.inventoryState,
   );
   const [vehicleId, setVehicleId] = useState(variant.metadata.assignedVehicleId ?? "");
+  const [imageUrls, setImageUrls] = useState(() => getVariantImageUrls(variant));
+  const [imageUploads, setImageUploads] = useState<Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }>>([]);
+  const removedImageUploadsRef = useRef<Set<ProductImageUploadDraft>>(new Set());
+  const [imageError, setImageError] = useState("");
+  const maxVariantPhotos = 4;
+  const uploadsAreReady = imageUploads.every((upload) => !upload.uploading && upload.uploadedUrl);
+  const canSave = Boolean(
+    title.trim() &&
+      sku.trim() &&
+      uploadsAreReady &&
+      Number.isFinite(quantity) &&
+      quantity >= 0 &&
+      (inventoryState === "IN_WAREHOUSE" || vehicleId),
+  );
+
+  async function handleVariantPhotoChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+
+    if (!files.length) {
+      return;
+    }
+
+    const maxOriginalBytes = 30 * 1024 * 1024;
+
+    if (imageUrls.length + imageUploads.length + files.length > maxVariantPhotos) {
+      setImageError(`Keep up to ${maxVariantPhotos} variant photos.`);
+      event.target.value = "";
+      return;
+    }
+
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        setImageError("Choose image files only.");
+        event.target.value = "";
+        return;
+      }
+
+      if (file.size > maxOriginalBytes) {
+        setImageError("Choose images under 30 MB.");
+        event.target.value = "";
+        return;
+      }
+    }
+
+    const nextUploads: Array<ProductImageUploadDraft & { uploadedUrl?: string; uploading?: boolean }> = [];
+
+    for (const file of files) {
+      try {
+        const dataUrl = await compressImageFileToDataUrl(file);
+        nextUploads.push({
+          dataUrl,
+          fileName: toCompressedImageFileName(file.name || "variant-photo"),
+          mimeType: "image/jpeg",
+          uploading: true,
+        });
+      } catch {
+        setImageError("Unable to process one of those images. Try another photo.");
+        event.target.value = "";
+        return;
+      }
+    }
+
+    setImageUploads((current) => [...current, ...nextUploads].slice(0, maxVariantPhotos - imageUrls.length));
+    setImageError("");
+    event.target.value = "";
+
+    for (const imageUpload of nextUploads) {
+      try {
+        const uploadedUrl = await uploadProductImage(imageUpload);
+
+        if (removedImageUploadsRef.current.has(imageUpload)) {
+          removedImageUploadsRef.current.delete(imageUpload);
+          void deleteUploadedProductImage(uploadedUrl).catch(() => {
+            setImageError("Image was removed, but Medusa cleanup failed. It will be cleaned up later.");
+          });
+          continue;
+        }
+
+        setImageUploads((current) =>
+          current.map((item) =>
+            item === imageUpload
+              ? {
+                  ...item,
+                  uploadedUrl,
+                  uploading: false,
+                }
+              : item,
+          ),
+        );
+      } catch (caught) {
+        removedImageUploadsRef.current.delete(imageUpload);
+        setImageUploads((current) =>
+          current.map((item) =>
+            item === imageUpload
+              ? {
+                  ...item,
+                  uploading: false,
+                }
+              : item,
+          ),
+        );
+        setImageError(caught instanceof Error ? caught.message : "Variant image upload failed.");
+      }
+    }
+  }
+
+  function removeExistingVariantPhoto(indexToRemove: number) {
+    setImageUrls((current) => current.filter((_, index) => index !== indexToRemove));
+    setImageError("");
+  }
+
+  function removeUploadedVariantPhoto(indexToRemove: number) {
+    const uploadToRemove = imageUploads[indexToRemove];
+
+    if (uploadToRemove?.uploadedUrl) {
+      void deleteUploadedProductImage(uploadToRemove.uploadedUrl).catch(() => {
+        setImageError("Unable to delete that temporary image from Medusa. It will be cleaned up later.");
+      });
+    } else if (uploadToRemove?.uploading) {
+      removedImageUploadsRef.current.add(uploadToRemove);
+    }
+
+    setImageUploads((current) => current.filter((_, index) => index !== indexToRemove));
+    setImageError("");
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSave) {
+      return;
+    }
+
     const nextVehicleId = inventoryState === "ON_VEHICLE" ? vehicleId : undefined;
+    const nextImageUrls = [
+      ...imageUrls,
+      ...imageUploads.map((upload) => upload.uploadedUrl).filter((url): url is string => Boolean(url)),
+    ];
 
     onUpdateVariantDetails(variant.id, {
       barcode: barcode.trim() || undefined,
       brand: (productBrand || brand).trim() || undefined,
+      imageUrls: nextImageUrls,
       inventoryState,
       priceCents: dollarsToCents(price),
       quantity,
@@ -3160,9 +3297,6 @@ function VariantContractCard({
       title: title.trim(),
       vehicleId: nextVehicleId,
     });
-    onUpdateQuantity(variant.id, quantity);
-    onSetState(variant.id, inventoryState);
-    onAssignVehicle(variant.id, nextVehicleId ?? "warehouse");
   }
 
   return (
@@ -3195,6 +3329,88 @@ function VariantContractCard({
           <Input label="Price" min={0} onChange={(event) => setPrice(event.target.value)} step="0.01" type="number" value={price} />
           <Input label="Available quantity" min={0} onChange={(event) => setQuantity(Number(event.target.value))} type="number" value={quantity} />
         </div>
+        <div className="grid gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-black uppercase text-[var(--bb-muted)]">Variant images</p>
+            <Badge tone="neutral">
+              {imageUrls.length + imageUploads.length} / {maxVariantPhotos}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {imageUrls.map((imageUrl, index) => (
+              <div
+                className="group relative overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]"
+                key={`${imageUrl}-${index}`}
+              >
+                <InventoryImage
+                  alt=""
+                  className="aspect-square w-full object-cover"
+                  fallback={
+                    <div className="grid aspect-square place-items-center text-[var(--bb-muted)]">
+                      <Image size={24} aria-hidden="true" />
+                    </div>
+                  }
+                  src={imageUrl}
+                />
+                <button
+                  aria-label={`Remove saved variant image ${index + 1}`}
+                  className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
+                  onClick={() => removeExistingVariantPhoto(index)}
+                  type="button"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+
+            {imageUploads.map((upload, index) => (
+              <div
+                className="group relative overflow-hidden rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)]"
+                key={`${upload.fileName}-${index}`}
+              >
+                <img
+                  alt=""
+                  className="aspect-square w-full object-cover"
+                  src={upload.dataUrl}
+                />
+                <button
+                  aria-label={`Remove ${upload.fileName}`}
+                  className="absolute right-2 top-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-charcoal)] shadow transition hover:bg-white"
+                  onClick={() => removeUploadedVariantPhoto(index)}
+                  type="button"
+                >
+                  Remove
+                </button>
+                {upload.uploading ? (
+                  <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[var(--bb-muted)] shadow">
+                    Uploading
+                  </span>
+                ) : null}
+              </div>
+            ))}
+
+            {imageUrls.length + imageUploads.length < maxVariantPhotos ? (
+              <label className="grid aspect-square cursor-pointer place-items-center rounded-3xl border-2 border-dashed border-[var(--bb-line)] bg-white transition hover:border-[var(--bb-blaze)] hover:bg-[var(--bb-blaze-soft)]">
+                <span className="grid place-items-center gap-2 text-center">
+                  <span className="grid size-12 place-items-center rounded-full bg-[var(--bb-blaze-soft)] text-[var(--bb-blaze)]">
+                    <Plus size={28} aria-hidden="true" />
+                  </span>
+                  <span className="text-xs font-black uppercase text-[var(--bb-muted)]">
+                    Add Photo
+                  </span>
+                </span>
+                <input
+                  accept="image/*"
+                  className="sr-only"
+                  multiple
+                  onChange={handleVariantPhotoChange}
+                  type="file"
+                />
+              </label>
+            ) : null}
+          </div>
+          {imageError ? <InlineNotice tone="warning">{imageError}</InlineNotice> : null}
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Select label="Stock location" onChange={(event) => setInventoryState(event.target.value as InventoryState)} value={inventoryState}>
             <option value="IN_WAREHOUSE">In warehouse</option>
@@ -3215,7 +3431,12 @@ function VariantContractCard({
             <Input disabled label="Delivery vehicle" value="Not assigned" />
           )}
         </div>
-        <Button fullWidth loading={busy} type="submit">
+        {!canSave ? (
+          <InlineNotice tone="warning">
+            Finish uploads and choose a vehicle for on-vehicle stock before saving.
+          </InlineNotice>
+        ) : null}
+        <Button fullWidth disabled={!canSave} loading={busy} type="submit">
           Save variant
         </Button>
       </form>
