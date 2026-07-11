@@ -38,6 +38,7 @@ import {
   clearInventorySession,
   completeInventoryGoogleLogin,
   getInventorySession,
+  getInventorySessionToken,
   loginInventory,
   startInventoryGoogleLogin,
   type InventorySession,
@@ -756,7 +757,7 @@ function VariantThumbnail({
       }`}
     >
       {imageUrl ? (
-        <img alt="" className="size-full object-cover" src={getInventoryImageSrc(imageUrl)} />
+        <InventoryImage alt="" className="size-full object-cover" src={imageUrl} />
       ) : (
         <Image size={compact ? 18 : 21} aria-hidden="true" />
       )}
@@ -2414,10 +2415,15 @@ function ProductImageBrowser({
     <aside className="rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3">
       <div className="overflow-hidden rounded-2xl border border-[var(--bb-line)] bg-white">
         {selectedImageUrl ? (
-          <img
+          <InventoryImage
             alt={productTitle}
             className="aspect-square w-full object-contain p-2"
-            src={getInventoryImageSrc(selectedImageUrl)}
+            fallback={
+              <div className="grid aspect-square place-items-center text-[var(--bb-muted)]">
+                <Image size={30} aria-hidden="true" />
+              </div>
+            }
+            src={selectedImageUrl}
           />
         ) : (
           <div className="grid aspect-square place-items-center text-[var(--bb-muted)]">
@@ -2449,10 +2455,10 @@ function ProductImageBrowser({
                 onClick={() => onSelect(index)}
                 type="button"
               >
-                <img
+                <InventoryImage
                   alt=""
                   className="size-full object-cover"
-                  src={getInventoryImageSrc(imageUrl)}
+                  src={imageUrl}
                 />
               </button>
             ))}
@@ -2470,8 +2476,11 @@ function ProductImageBrowser({
 function getProductImageUrls(product: InventoryProduct, imageOverride = "") {
   const urls = [
     imageOverride,
+    product.imageUrl,
     ...(product.imageUrls ?? []),
     product.thumbnail,
+    ...(product.images ?? []).map(readImageValueUrl),
+    ...(product.productImages ?? []).map(readImageValueUrl),
   ];
 
   return Array.from(
@@ -2483,11 +2492,15 @@ function getProductImageUrls(product: InventoryProduct, imageOverride = "") {
   );
 }
 
+function getProductMainImageUrl(product: InventoryProduct) {
+  return getProductImageUrls(product)[0] ?? "";
+}
+
 function getVariantMainImageUrl(variant: InventoryVariant) {
   const urls = [
     variant.imageUrl,
     ...(variant.imageUrls ?? []),
-    ...(variant.images ?? []).map((image) => (typeof image === "string" ? image : image.url ?? "")),
+    ...(variant.images ?? []).map(readImageValueUrl),
   ];
 
   return (
@@ -2497,15 +2510,21 @@ function getVariantMainImageUrl(variant: InventoryVariant) {
   );
 }
 
+function readImageValueUrl(image: string | { url?: string }) {
+  return typeof image === "string" ? image : image.url ?? "";
+}
+
 function getProductVariantBrand(product: InventoryProduct) {
   return product.variants.find((variant) => variant.metadata.brand?.trim())?.metadata.brand?.trim() ?? "";
 }
 
 function ProductThumbnail({ product }: { product: InventoryProduct }) {
+  const imageUrl = getProductMainImageUrl(product);
+
   return (
     <span className="grid size-14 shrink-0 overflow-hidden rounded-2xl bg-[var(--bb-surface-warm)] text-[var(--bb-muted)] md:size-16">
-      {product.thumbnail ? (
-        <img alt="" className="size-full object-cover" src={getInventoryImageSrc(product.thumbnail)} />
+      {imageUrl ? (
+        <InventoryImage alt="" className="size-full object-cover" src={imageUrl} />
       ) : (
         <span className="grid place-items-center">
           <Image size={22} aria-hidden="true" />
@@ -3261,6 +3280,106 @@ function getInventoryImageSrc(value: string) {
   }
 
   return `/api/inventory-image?filename=${encodeURIComponent(match[1])}`;
+}
+
+function InventoryImage({
+  alt,
+  className,
+  fallback = null,
+  src,
+}: {
+  alt: string;
+  className: string;
+  fallback?: ReactNode;
+  src: string;
+}) {
+  const imageSrc = getInventoryImageSrc(src);
+  const needsAuth = isInventoryImageProxySrc(imageSrc);
+  const [loadedImage, setLoadedImage] = useState({
+    failed: false,
+    objectUrl: "",
+    src: "",
+  });
+
+  useEffect(() => {
+    if (!needsAuth || !imageSrc) {
+      return;
+    }
+
+    const controller = new AbortController();
+    let nextObjectUrl = "";
+
+    fetch(imageSrc, {
+      headers: {
+        ...(getInventorySessionToken() ? { Authorization: `Bearer ${getInventorySessionToken()}` } : {}),
+      },
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Inventory image request failed with HTTP ${response.status}.`);
+        }
+
+        return response.blob();
+      })
+      .then((blob) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        nextObjectUrl = URL.createObjectURL(blob);
+        setLoadedImage((current) => {
+          if (current.objectUrl && current.objectUrl !== nextObjectUrl) {
+            URL.revokeObjectURL(current.objectUrl);
+          }
+
+          return {
+            failed: false,
+            objectUrl: nextObjectUrl,
+            src: imageSrc,
+          };
+        });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setLoadedImage((current) => {
+            if (current.objectUrl) {
+              URL.revokeObjectURL(current.objectUrl);
+            }
+
+            return {
+              failed: true,
+              objectUrl: "",
+              src: imageSrc,
+            };
+          });
+        }
+      });
+
+    return () => {
+      controller.abort();
+
+      if (nextObjectUrl) {
+        URL.revokeObjectURL(nextObjectUrl);
+      }
+    };
+  }, [imageSrc, needsAuth]);
+
+  const loadedForCurrentSource = loadedImage.src === imageSrc;
+
+  if (!imageSrc || (loadedForCurrentSource && loadedImage.failed)) {
+    return fallback;
+  }
+
+  if (needsAuth && (!loadedForCurrentSource || !loadedImage.objectUrl)) {
+    return fallback;
+  }
+
+  return <img alt={alt} className={className} src={needsAuth ? loadedImage.objectUrl : imageSrc} />;
+}
+
+function isInventoryImageProxySrc(value: string) {
+  return value.startsWith("/api/inventory-image?");
 }
 
 function getImagePathname(imageUrl: string) {
