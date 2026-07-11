@@ -1866,6 +1866,7 @@ async function uploadProductImage(imageUpload: ProductImageUploadDraft) {
 
   const response = await fetch("/api/inventory-image", {
     body: formData,
+    headers: getInventoryAuthorizationHeaders(),
     method: "POST",
   });
 
@@ -1927,6 +1928,7 @@ async function deleteUploadedProductImages(urls: string[]) {
   const response = await fetch("/api/inventory-image", {
     body: JSON.stringify({ urls: uniqueUrls }),
     headers: {
+      ...getInventoryAuthorizationHeaders(),
       "Content-Type": "application/json",
     },
     keepalive: true,
@@ -3310,9 +3312,7 @@ function InventoryImage({
     let nextObjectUrl = "";
 
     fetch(imageSrc, {
-      headers: {
-        ...(getInventorySessionToken() ? { Authorization: `Bearer ${getInventorySessionToken()}` } : {}),
-      },
+      headers: getInventoryAuthorizationHeaders(),
       signal: controller.signal,
     })
       .then((response) => {
@@ -3380,6 +3380,12 @@ function InventoryImage({
 
 function isInventoryImageProxySrc(value: string) {
   return value.startsWith("/api/inventory-image?");
+}
+
+function getInventoryAuthorizationHeaders(): Record<string, string> {
+  const token = getInventorySessionToken();
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 function getImagePathname(imageUrl: string) {
