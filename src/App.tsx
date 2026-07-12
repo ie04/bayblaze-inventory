@@ -153,6 +153,41 @@ function App() {
       onUpdateProductDetails={(productId, draft) =>
         void applyMutation({ type: "update-product-details", productId, draft })
       }
+      onUpdateProductVariantPrices={async (productId, priceCents) => {
+        const product = snapshot?.products.find((item) => item.id === productId);
+
+        if (!product) {
+          setError("Product was not found.");
+          return false;
+        }
+
+        if (product.variants.length === 0) {
+          setError("Add a variant before setting product pricing.");
+          return false;
+        }
+
+        setBusy(true);
+        setError("");
+        try {
+          let nextSnapshot: InventorySnapshot | null = snapshot;
+
+          for (const variant of product.variants) {
+            nextSnapshot = await mutateInventory({
+              type: "update-variant-details",
+              variantId: variant.id,
+              draft: { priceCents },
+            });
+          }
+
+          setSnapshot(nextSnapshot);
+          return true;
+        } catch (caught) {
+          setError(caught instanceof Error ? caught.message : "Product prices could not be updated.");
+          return false;
+        } finally {
+          setBusy(false);
+        }
+      }}
       onDeleteProduct={(productId) =>
         void applyMutation({ type: "delete-product", productId })
       }
@@ -415,6 +450,7 @@ function InventoryScreen({
   onOpenAddProduct,
   onSetState,
   onUpdateProductDetails,
+  onUpdateProductVariantPrices,
   onDeleteProduct,
   onUpdateVariantDetails,
   onUpdateQuantity,
@@ -431,6 +467,7 @@ function InventoryScreen({
   onOpenAddProduct: () => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onUpdateProductVariantPrices: (productId: string, priceCents: number) => Promise<boolean> | boolean;
   onDeleteProduct: (productId: string) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
@@ -465,6 +502,7 @@ function InventoryScreen({
       onOpenAddProduct={onOpenAddProduct}
       onSetState={onSetState}
       onUpdateProductDetails={onUpdateProductDetails}
+      onUpdateProductVariantPrices={onUpdateProductVariantPrices}
       onDeleteProduct={onDeleteProduct}
       onUpdateQuantity={onUpdateQuantity}
       onUpdateVariantDetails={onUpdateVariantDetails}
@@ -483,6 +521,7 @@ function ProductsView({
   onOpenAddProduct,
   onSetState,
   onUpdateProductDetails,
+  onUpdateProductVariantPrices,
   onDeleteProduct,
   onUpdateQuantity,
   onUpdateVariantDetails,
@@ -496,6 +535,7 @@ function ProductsView({
   onOpenAddProduct: () => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onUpdateProductVariantPrices: (productId: string, priceCents: number) => Promise<boolean> | boolean;
   onDeleteProduct: (productId: string) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
@@ -558,6 +598,7 @@ function ProductsView({
           onCreateVariant={onCreateVariant}
           onSetState={onSetState}
           onUpdateProductDetails={onUpdateProductDetails}
+          onUpdateProductVariantPrices={onUpdateProductVariantPrices}
           onDeleteProduct={onDeleteProduct}
           onUpdateQuantity={onUpdateQuantity}
           onUpdateVariantDetails={onUpdateVariantDetails}
@@ -932,6 +973,7 @@ function ProductEditorDialog({
   onCreateVariant,
   onSetState,
   onUpdateProductDetails,
+  onUpdateProductVariantPrices,
   onDeleteProduct,
   onUpdateQuantity,
   onUpdateVariantDetails,
@@ -946,6 +988,7 @@ function ProductEditorDialog({
   onCreateVariant: (productId: string, draft: VariantDraft) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onUpdateProductVariantPrices: (productId: string, priceCents: number) => Promise<boolean> | boolean;
   onDeleteProduct: (productId: string) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
@@ -1017,6 +1060,7 @@ function ProductEditorDialog({
           ) : (
             <ProductDetailsCard
               busy={busy}
+              key={product.id}
               collections={collections}
               product={product}
               categoryOptions={categoryOptions}
@@ -1025,6 +1069,7 @@ function ProductEditorDialog({
               onAssignVehicle={onAssignVehicle}
               onSetState={onSetState}
               onUpdateProductDetails={onUpdateProductDetails}
+              onUpdateProductVariantPrices={onUpdateProductVariantPrices}
               onDeleteProduct={() => {
                 onDeleteProduct(product.id);
                 onClose();
@@ -2138,6 +2183,7 @@ function ProductDetailsCard({
   onAssignVehicle,
   onSetState,
   onUpdateProductDetails,
+  onUpdateProductVariantPrices,
   onDeleteProduct,
   onUpdateQuantity,
   onUpdateVariantDetails,
@@ -2151,6 +2197,7 @@ function ProductDetailsCard({
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
+  onUpdateProductVariantPrices: (productId: string, priceCents: number) => Promise<boolean> | boolean;
   onDeleteProduct: () => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
@@ -2169,6 +2216,9 @@ function ProductDetailsCard({
   const [newCategory, setNewCategory] = useState("");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUrl, setImageUrl] = useState(() => getProductImageUrls(product)[0] ?? "");
+  const [variantPrice, setVariantPrice] = useState(() => getSharedVariantPriceInput(product));
+  const [priceNotice, setPriceNotice] = useState("");
+  const [priceError, setPriceError] = useState("");
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const productImageUrls = useMemo(() => getProductImageUrls(product, imageUrl), [imageUrl, product]);
   const safeSelectedImageIndex =
@@ -2246,6 +2296,30 @@ function ProductDetailsCard({
     onUpdateProductDetails(product.id, {
       status: "draft",
     });
+  }
+
+  async function saveVariantPrices() {
+    const priceCents = dollarsToCents(variantPrice);
+
+    if (product.variants.length === 0) {
+      setPriceError("Add a variant before setting product pricing.");
+      setPriceNotice("");
+      return;
+    }
+
+    if (priceCents <= 0) {
+      setPriceError("Enter a price greater than $0.00.");
+      setPriceNotice("");
+      return;
+    }
+
+    setPriceError("");
+    setPriceNotice("");
+    const saved = await onUpdateProductVariantPrices(product.id, priceCents);
+
+    if (saved) {
+      setPriceNotice(`All ${product.variants.length} variant${product.variants.length === 1 ? "" : "s"} now use ${formatMoney(priceCents)}.`);
+    }
   }
 
   return (
@@ -2368,6 +2442,37 @@ function ProductDetailsCard({
         </summary>
 
         <div className="mt-4 space-y-4">
+          <div className="grid gap-3 rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <Input
+              label="Product price across variants"
+              min={0}
+              onChange={(event) => {
+                setVariantPrice(event.target.value);
+                setPriceNotice("");
+                setPriceError("");
+              }}
+              placeholder={product.variants.length > 0 ? "Mixed prices" : "0.00"}
+              step="0.01"
+              type="number"
+              value={variantPrice}
+            />
+            <Button
+              disabled={busy || product.variants.length === 0}
+              onClick={() => void saveVariantPrices()}
+              type="button"
+              variant="secondary"
+            >
+              Apply to all variants
+            </Button>
+            <div className="sm:col-span-2">
+              <p className="text-xs font-bold leading-5 text-[var(--bb-muted)]">
+                Sets the same storefront price for every variant on this product. Individual variant prices can still be changed below.
+              </p>
+              {priceNotice ? <InlineNotice tone="success">{priceNotice}</InlineNotice> : null}
+              {priceError ? <InlineNotice tone="warning">{priceError}</InlineNotice> : null}
+            </div>
+          </div>
+
           <Button fullWidth onClick={onAddVariant} type="button">
             <Plus size={18} aria-hidden="true" />
             Add variant
@@ -3634,6 +3739,22 @@ function centsToDollarsString(cents: number) {
   }
 
   return (cents / 100).toFixed(2);
+}
+
+function getSharedVariantPriceInput(product: InventoryProduct) {
+  if (product.variants.length === 0) {
+    return "";
+  }
+
+  const [firstVariant] = product.variants;
+
+  if (!firstVariant) {
+    return "";
+  }
+
+  return product.variants.every((variant) => variant.priceCents === firstVariant.priceCents)
+    ? centsToDollarsString(firstVariant.priceCents)
+    : "";
 }
 
 function dollarsToCents(value: string) {

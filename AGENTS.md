@@ -111,7 +111,10 @@ The inventory Stock screen should remain the direct editor for human-friendly
 variant contract fields: variant name, SKU, brand, barcode, price, available
 quantity, stock location, and delivery vehicle. Avoid exposing raw variable
 names such as `inventoryState`, `availableQuantity`, or `assignedVehicleId` in
-primary UI labels.
+primary UI labels. The product editor also provides a product-level price
+control that applies one price across all variants by issuing existing
+`update-variant-details` mutations for each variant; individual variant price
+editing remains available below that bulk control.
 
 BayBlaze product variants must include metadata:
 
