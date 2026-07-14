@@ -188,6 +188,41 @@ function App() {
           setBusy(false);
         }
       }}
+      onUpdateProductVariantUnitPrices={async (productId, unitPriceCents) => {
+        const product = snapshot?.products.find((item) => item.id === productId);
+
+        if (!product) {
+          setError("Product was not found.");
+          return false;
+        }
+
+        if (product.variants.length === 0) {
+          setError("Add a variant before setting unit cost.");
+          return false;
+        }
+
+        setBusy(true);
+        setError("");
+        try {
+          let nextSnapshot: InventorySnapshot | null = snapshot;
+
+          for (const variant of product.variants) {
+            nextSnapshot = await mutateInventory({
+              type: "update-variant-details",
+              variantId: variant.id,
+              draft: { unitPriceCents },
+            });
+          }
+
+          setSnapshot(nextSnapshot);
+          return true;
+        } catch (caught) {
+          setError(caught instanceof Error ? caught.message : "Product unit costs could not be updated.");
+          return false;
+        } finally {
+          setBusy(false);
+        }
+      }}
       onDeleteProduct={(productId) =>
         void applyMutation({ type: "delete-product", productId })
       }
@@ -451,6 +486,7 @@ function InventoryScreen({
   onSetState,
   onUpdateProductDetails,
   onUpdateProductVariantPrices,
+  onUpdateProductVariantUnitPrices,
   onDeleteProduct,
   onUpdateVariantDetails,
   onUpdateQuantity,
@@ -468,6 +504,7 @@ function InventoryScreen({
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductVariantPrices: (productId: string, priceCents: number) => Promise<boolean> | boolean;
+  onUpdateProductVariantUnitPrices: (productId: string, unitPriceCents: number) => Promise<boolean> | boolean;
   onDeleteProduct: (productId: string) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
@@ -503,6 +540,7 @@ function InventoryScreen({
       onSetState={onSetState}
       onUpdateProductDetails={onUpdateProductDetails}
       onUpdateProductVariantPrices={onUpdateProductVariantPrices}
+      onUpdateProductVariantUnitPrices={onUpdateProductVariantUnitPrices}
       onDeleteProduct={onDeleteProduct}
       onUpdateQuantity={onUpdateQuantity}
       onUpdateVariantDetails={onUpdateVariantDetails}
@@ -522,6 +560,7 @@ function ProductsView({
   onSetState,
   onUpdateProductDetails,
   onUpdateProductVariantPrices,
+  onUpdateProductVariantUnitPrices,
   onDeleteProduct,
   onUpdateQuantity,
   onUpdateVariantDetails,
@@ -536,6 +575,7 @@ function ProductsView({
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductVariantPrices: (productId: string, priceCents: number) => Promise<boolean> | boolean;
+  onUpdateProductVariantUnitPrices: (productId: string, unitPriceCents: number) => Promise<boolean> | boolean;
   onDeleteProduct: (productId: string) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
@@ -599,6 +639,7 @@ function ProductsView({
           onSetState={onSetState}
           onUpdateProductDetails={onUpdateProductDetails}
           onUpdateProductVariantPrices={onUpdateProductVariantPrices}
+          onUpdateProductVariantUnitPrices={onUpdateProductVariantUnitPrices}
           onDeleteProduct={onDeleteProduct}
           onUpdateQuantity={onUpdateQuantity}
           onUpdateVariantDetails={onUpdateVariantDetails}
@@ -930,6 +971,9 @@ function ProductCard({
     (lowest, variant) => (!lowest || variant.priceCents < lowest.priceCents ? variant : lowest),
     null,
   );
+  const cheapestVariantProfit = cheapestVariant
+    ? cheapestVariant.priceCents - (cheapestVariant.metadata.unitPriceCents ?? 0)
+    : null;
 
   return (
     <button className="w-full text-left" onClick={onSelect} type="button">
@@ -948,6 +992,11 @@ function ProductCard({
               {product.variants.length} variant{product.variants.length === 1 ? "" : "s"}
               {cheapestVariant ? ` · From ${formatMoney(cheapestVariant.priceCents)}` : " · No variants yet"}
             </p>
+            {cheapestVariant ? (
+              <p className="mt-1 truncate text-xs font-bold text-[var(--bb-muted)]">
+                Unit cost {formatMoney(cheapestVariant.metadata.unitPriceCents ?? 0)} · Profit {formatMoney(cheapestVariantProfit ?? 0)}
+              </p>
+            ) : null}
             <p className="mt-1 truncate text-xs font-bold text-[var(--bb-muted)]">
               /{product.handle}
             </p>
@@ -974,6 +1023,7 @@ function ProductEditorDialog({
   onSetState,
   onUpdateProductDetails,
   onUpdateProductVariantPrices,
+  onUpdateProductVariantUnitPrices,
   onDeleteProduct,
   onUpdateQuantity,
   onUpdateVariantDetails,
@@ -989,6 +1039,7 @@ function ProductEditorDialog({
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductVariantPrices: (productId: string, priceCents: number) => Promise<boolean> | boolean;
+  onUpdateProductVariantUnitPrices: (productId: string, unitPriceCents: number) => Promise<boolean> | boolean;
   onDeleteProduct: (productId: string) => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
@@ -1070,6 +1121,7 @@ function ProductEditorDialog({
               onSetState={onSetState}
               onUpdateProductDetails={onUpdateProductDetails}
               onUpdateProductVariantPrices={onUpdateProductVariantPrices}
+              onUpdateProductVariantUnitPrices={onUpdateProductVariantUnitPrices}
               onDeleteProduct={() => {
                 onDeleteProduct(product.id);
                 onClose();
@@ -1125,6 +1177,7 @@ function AddProductFlow({
   const [sku, setSku] = useState("");
   const [barcode, setBarcode] = useState("");
   const [price, setPrice] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
   const [inventoryState, setInventoryState] = useState<InventoryState>("IN_WAREHOUSE");
   const [availableQuantity, setAvailableQuantity] = useState("");
   const [vehicleId, setVehicleId] = useState("");
@@ -1455,6 +1508,7 @@ function AddProductFlow({
         quantity: availableQuantityNumber,
         sku: sku.trim(),
         title: variantTitle.trim(),
+        unitPriceCents: dollarsToCents(unitPrice),
         vehicleId: inventoryState === "ON_VEHICLE" ? vehicleId || undefined : undefined,
       },
     });
@@ -1772,6 +1826,15 @@ function AddProductFlow({
                 type="number"
                 value={price}
               />
+              <Input
+                label="Unit cost"
+                min={0}
+                onChange={(event) => setUnitPrice(event.target.value)}
+                placeholder="12.25"
+                step="0.01"
+                type="number"
+                value={unitPrice}
+              />
             </div>
           </Card>
         ) : null}
@@ -1853,6 +1916,10 @@ function AddProductFlow({
                 </p>
                 <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
                   SKU: {sku.trim() || "Missing"} · Price: {price.trim() ? `$${price.trim()}` : "$0.00"}
+                </p>
+                <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                  Unit cost: {unitPrice.trim() ? `$${unitPrice.trim()}` : "$0.00"} · Profit:{" "}
+                  {formatMoney(dollarsToCents(price) - dollarsToCents(unitPrice))}
                 </p>
                 <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
                   {availableQuantityNumber} unit{availableQuantityNumber === 1 ? "" : "s"} ·{" "}
@@ -2184,6 +2251,7 @@ function ProductDetailsCard({
   onSetState,
   onUpdateProductDetails,
   onUpdateProductVariantPrices,
+  onUpdateProductVariantUnitPrices,
   onDeleteProduct,
   onUpdateQuantity,
   onUpdateVariantDetails,
@@ -2198,6 +2266,7 @@ function ProductDetailsCard({
   onSetState: (variantId: string, state: InventoryState) => void;
   onUpdateProductDetails: (productId: string, draft: ProductUpdateDraft) => void;
   onUpdateProductVariantPrices: (productId: string, priceCents: number) => Promise<boolean> | boolean;
+  onUpdateProductVariantUnitPrices: (productId: string, unitPriceCents: number) => Promise<boolean> | boolean;
   onDeleteProduct: () => void;
   onUpdateQuantity: (variantId: string, quantity: number) => void;
   onUpdateVariantDetails: (variantId: string, draft: VariantUpdateDraft) => void;
@@ -2217,8 +2286,11 @@ function ProductDetailsCard({
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [imageUrl, setImageUrl] = useState(() => getProductImageUrls(product)[0] ?? "");
   const [variantPrice, setVariantPrice] = useState(() => getSharedVariantPriceInput(product));
+  const [variantUnitPrice, setVariantUnitPrice] = useState(() => getSharedVariantUnitPriceInput(product));
   const [priceNotice, setPriceNotice] = useState("");
   const [priceError, setPriceError] = useState("");
+  const [unitPriceNotice, setUnitPriceNotice] = useState("");
+  const [unitPriceError, setUnitPriceError] = useState("");
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const productImageUrls = useMemo(() => getProductImageUrls(product, imageUrl), [imageUrl, product]);
   const safeSelectedImageIndex =
@@ -2319,6 +2391,30 @@ function ProductDetailsCard({
 
     if (saved) {
       setPriceNotice(`All ${product.variants.length} variant${product.variants.length === 1 ? "" : "s"} now use ${formatMoney(priceCents)}.`);
+    }
+  }
+
+  async function saveVariantUnitPrices() {
+    const unitPriceCents = dollarsToCents(variantUnitPrice);
+
+    if (product.variants.length === 0) {
+      setUnitPriceError("Add a variant before setting unit cost.");
+      setUnitPriceNotice("");
+      return;
+    }
+
+    if (!variantUnitPrice.trim()) {
+      setUnitPriceError("Enter the unit cost for this product.");
+      setUnitPriceNotice("");
+      return;
+    }
+
+    setUnitPriceError("");
+    setUnitPriceNotice("");
+    const saved = await onUpdateProductVariantUnitPrices(product.id, unitPriceCents);
+
+    if (saved) {
+      setUnitPriceNotice(`All ${product.variants.length} variant${product.variants.length === 1 ? "" : "s"} now use ${formatMoney(unitPriceCents)} unit cost.`);
     }
   }
 
@@ -2470,6 +2566,37 @@ function ProductDetailsCard({
               </p>
               {priceNotice ? <InlineNotice tone="success">{priceNotice}</InlineNotice> : null}
               {priceError ? <InlineNotice tone="warning">{priceError}</InlineNotice> : null}
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-3xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <Input
+              label="Unit cost across variants"
+              min={0}
+              onChange={(event) => {
+                setVariantUnitPrice(event.target.value);
+                setUnitPriceNotice("");
+                setUnitPriceError("");
+              }}
+              placeholder={product.variants.length > 0 ? "Mixed unit costs" : "0.00"}
+              step="0.01"
+              type="number"
+              value={variantUnitPrice}
+            />
+            <Button
+              disabled={busy || product.variants.length === 0}
+              onClick={() => void saveVariantUnitPrices()}
+              type="button"
+              variant="secondary"
+            >
+              Apply to all variants
+            </Button>
+            <div className="sm:col-span-2">
+              <p className="text-xs font-bold leading-5 text-[var(--bb-muted)]">
+                Stores internal unit cost for profit calculations. This does not change the storefront price.
+              </p>
+              {unitPriceNotice ? <InlineNotice tone="success">{unitPriceNotice}</InlineNotice> : null}
+              {unitPriceError ? <InlineNotice tone="warning">{unitPriceError}</InlineNotice> : null}
             </div>
           </div>
 
@@ -2675,6 +2802,7 @@ function AddVariantWizard({
   const [brand, setBrand] = useState(productBrand);
   const [barcode, setBarcode] = useState("");
   const [price, setPrice] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
   const [quantity, setQuantity] = useState("");
   const [inventoryState, setInventoryState] = useState<InventoryState>("IN_WAREHOUSE");
   const [vehicleId, setVehicleId] = useState("");
@@ -2932,6 +3060,7 @@ function AddVariantWizard({
       quantity: quantityNumber,
       sku: sku.trim(),
       title: title.trim(),
+      unitPriceCents: dollarsToCents(unitPrice),
       vehicleId: inventoryState === "ON_VEHICLE" ? vehicleId || undefined : undefined,
     });
   }
@@ -3119,6 +3248,15 @@ function AddVariantWizard({
               type="number"
               value={price}
             />
+            <Input
+              label="Unit cost"
+              min={0}
+              onChange={(event) => setUnitPrice(event.target.value)}
+              placeholder="12.25"
+              step="0.01"
+              type="number"
+              value={unitPrice}
+            />
           </div>
         </Card>
       ) : null}
@@ -3175,6 +3313,10 @@ function AddVariantWizard({
               </h3>
               <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
                 SKU: {sku.trim() || "Missing"} · Price: {price.trim() ? `$${price.trim()}` : "$0.00"}
+              </p>
+              <p className="mt-1 text-sm font-bold text-[var(--bb-muted)]">
+                Unit cost: {unitPrice.trim() ? `$${unitPrice.trim()}` : "$0.00"} · Profit:{" "}
+                {formatMoney(dollarsToCents(price) - dollarsToCents(unitPrice))}
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -3248,6 +3390,7 @@ function VariantContractCard({
   const [brand, setBrand] = useState(productBrand || variant.metadata.brand || "");
   const [barcode, setBarcode] = useState(variant.metadata.barcode ?? "");
   const [price, setPrice] = useState(centsToDollarsString(variant.priceCents));
+  const [unitPrice, setUnitPrice] = useState(centsToDollarsString(variant.metadata.unitPriceCents ?? 0));
   const [quantity, setQuantity] = useState(variant.metadata.availableQuantity);
   const [inventoryState, setInventoryState] = useState<InventoryState>(
     variant.metadata.inventoryState,
@@ -3400,6 +3543,7 @@ function VariantContractCard({
       quantity,
       sku: sku.trim(),
       title: title.trim(),
+      unitPriceCents: dollarsToCents(unitPrice),
       vehicleId: nextVehicleId,
     });
   }
@@ -3432,7 +3576,13 @@ function VariantContractCard({
           />
           <Input label="Barcode" onChange={(event) => setBarcode(event.target.value)} value={barcode} />
           <Input label="Price" min={0} onChange={(event) => setPrice(event.target.value)} step="0.01" type="number" value={price} />
+          <Input label="Unit cost" min={0} onChange={(event) => setUnitPrice(event.target.value)} step="0.01" type="number" value={unitPrice} />
           <Input label="Available quantity" min={0} onChange={(event) => setQuantity(Number(event.target.value))} type="number" value={quantity} />
+        </div>
+        <div className="grid gap-2 rounded-2xl border border-[var(--bb-line)] bg-[var(--bb-surface-warm)] p-3 sm:grid-cols-3">
+          <DetailMetric label="Listed price" value={formatMoney(dollarsToCents(price))} />
+          <DetailMetric label="Unit cost" value={formatMoney(dollarsToCents(unitPrice))} />
+          <DetailMetric label="Profit each" value={formatMoney(dollarsToCents(price) - dollarsToCents(unitPrice))} />
         </div>
         <div className="grid gap-3">
           <div className="flex items-center justify-between gap-3">
@@ -3546,6 +3696,15 @@ function VariantContractCard({
         </Button>
       </form>
     </Card>
+  );
+}
+
+function DetailMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs font-black uppercase text-[var(--bb-muted)]">{label}</p>
+      <p className="mt-1 text-sm font-black text-[var(--bb-charcoal)]">{value}</p>
+    </div>
   );
 }
 
@@ -3754,6 +3913,23 @@ function getSharedVariantPriceInput(product: InventoryProduct) {
 
   return product.variants.every((variant) => variant.priceCents === firstVariant.priceCents)
     ? centsToDollarsString(firstVariant.priceCents)
+    : "";
+}
+
+function getSharedVariantUnitPriceInput(product: InventoryProduct) {
+  if (product.variants.length === 0) {
+    return "";
+  }
+
+  const [firstVariant] = product.variants;
+  const firstUnitPrice = firstVariant?.metadata.unitPriceCents ?? 0;
+
+  if (!firstVariant) {
+    return "";
+  }
+
+  return product.variants.every((variant) => (variant.metadata.unitPriceCents ?? 0) === firstUnitPrice)
+    ? centsToDollarsString(firstUnitPrice)
     : "";
 }
 

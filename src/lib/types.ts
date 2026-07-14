@@ -7,6 +7,7 @@ export type VariantMetadata = {
   barcode?: string;
   brand?: string;
   inventoryState: InventoryState;
+  unitPriceCents?: number;
 };
 
 export type InventoryVariant = {
@@ -100,6 +101,7 @@ export type VariantDraft = {
   quantity: number;
   sku: string;
   title: string;
+  unitPriceCents?: number;
   vehicleId?: string;
 };
 

@@ -109,12 +109,15 @@ Keep `inventoryCategory` as the product metadata bridge for BayBlaze category
 labels.
 The inventory Stock screen should remain the direct editor for human-friendly
 variant contract fields: variant name, SKU, brand, barcode, price, available
-quantity, stock location, and delivery vehicle. Avoid exposing raw variable
+quantity, unit cost, stock location, and delivery vehicle. Avoid exposing raw variable
 names such as `inventoryState`, `availableQuantity`, or `assignedVehicleId` in
 primary UI labels. The product editor also provides a product-level price
 control that applies one price across all variants by issuing existing
 `update-variant-details` mutations for each variant; individual variant price
-editing remains available below that bulk control.
+editing remains available below that bulk control. Unit cost is separate from
+listed storefront price and is stored as variant metadata `unitPriceCents` for
+profit calculations; product-level unit cost controls apply that metadata value
+across all variants without changing Medusa price sets.
 
 BayBlaze product variants must include metadata:
 
@@ -124,6 +127,7 @@ availableQuantity: number
 assignedVehicleId?: string
 barcode?: string
 brand?: string
+unitPriceCents?: number
 ```
 
 `assignedVehicleId` is required when `inventoryState` is `ON_VEHICLE`.

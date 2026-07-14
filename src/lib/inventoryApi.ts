@@ -170,6 +170,7 @@ function applyDemoMutation(snapshot: InventorySnapshot, mutation: InventoryMutat
       barcode: draft.barcode ?? variant.metadata.barcode,
       brand: draft.brand ?? variant.metadata.brand,
       inventoryState: draft.inventoryState ?? variant.metadata.inventoryState,
+      unitPriceCents: draft.unitPriceCents ?? variant.metadata.unitPriceCents,
       availableQuantity: draft.quantity ?? variant.metadata.availableQuantity,
       assignedVehicleId:
         draft.inventoryState === "IN_WAREHOUSE"
@@ -254,6 +255,7 @@ function toDemoVariant(
       assignedVehicleId: draft.inventoryState === "ON_VEHICLE" ? draft.vehicleId : undefined,
       barcode: draft.barcode,
       brand: draft.brand,
+      unitPriceCents: draft.unitPriceCents,
     },
     updatedAt,
   };
