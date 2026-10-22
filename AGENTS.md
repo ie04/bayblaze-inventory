@@ -44,18 +44,14 @@ creating new primitives.
 - Do not configure inventory-app direct Medusa server env such as
   `MEDUSA_BACKEND_URL` or `BAYBLAZE_INVENTORY_SERVICE_TOKEN`; Medusa credentials
   belong behind `bayblaze-api`.
-- The Vercel `/api/inventory` proxy also reads active vehicles from Firebase
-  Firestore `vehicles` with Firebase Admin. Server-only Firebase env may be
-  provided either as `FIREBASE_SERVICE_ACCOUNT_JSON` or as
-  `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`.
-  This keeps Firestore as the driver vehicle source while Medusa remains the
-  inventory/product source. Firestore vehicle sync must be non-fatal: if it
-  fails, the proxy should still return Medusa inventory with a warning.
+- The Vercel inventory proxy only authenticates staff and forwards to
+  `bayblaze-api`. Vehicle records come from the API's shared registry; it must
+  not initialize Firebase Admin or read Firestore directly.
 - Production Vercel settings should use:
   `VITE_BAYBLAZE_INVENTORY_API_URL=/api`,
   `BAYBLAZE_API_URL=<shared bayblaze-api origin>`,
-  and `BAYBLAZE_API_SERVICE_TOKEN=<shared app-to-api token>`. Add Firebase Admin
-  server variables as above for vehicle dropdowns.
+  and `BAYBLAZE_API_SERVICE_TOKEN=<shared app-to-api token>`. Firebase Admin
+  credentials are not required in this frontend deployment.
 - The active production inventory app domain is `https://stock.bayblaze.net`.
   Keep this origin in `bayblaze-api` production `CORS_ORIGINS` so browser auth
   calls to `https://api.bayblaze.net` do not fail CORS preflight with
@@ -153,17 +149,18 @@ npm run lint
 - Server-only Medusa credentials belong in the backend/API boundary only.
 - Public browser config must use the `VITE_` prefix and must be safe to expose.
 
-## June 2026 Driver Vehicle Source Clarification
+## Shared Vehicle Registry
 
-- Vehicle dropdown/source data that comes from Firestore should read from the
-  `bayblaze-driver` Firebase project, not the `bayblaze-isochronos` project.
-  IsoChronos owns routing/cache/usage collections; the driver project owns
-  `vehicles`, `driver_profiles`, `driver_delivery_queues`, and live driver
-  location snapshots.
-- The inventory app may display and assign Medusa variant `assignedVehicleId`,
-  but it must not become the owner of driver queues, driver live locations, or
-  order delivery lifecycle status. Those remain driver/Medusa/IsoChronos
-  integration concerns.
+- `bayblaze-api` owns vehicles in the unified `bayblaze-isochronos` Firestore
+  database. The old `bayblaze-driver` project is no longer an app-facing vehicle
+  source. Inventory receives canonical vehicles on GET/POST `/v1/inventory`.
+- Admin creates/edits/deactivates vehicles through `/v1/admin/vehicles` routes;
+  Driver links and releases them through its existing API workflows.
+- Inventory can assign stock to an active vehicle even while a driver is linked.
+  API validation rejects missing/unknown/inactive target vehicles. Warehouse is
+  a stock-location choice, not a real vehicle document.
+- Vehicle IDs are immutable. Driver clock-out releases the driver link, not the
+  stock assigned to that vehicle. Commerce remains the stock source of truth.
 
 ## October 2026 Session Recovery
 

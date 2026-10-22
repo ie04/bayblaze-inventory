@@ -668,7 +668,7 @@ function VehiclesView({
   vehicles: DeliveryVehicle[];
   onAssignVehicle: (variantId: string, vehicleId: string) => void;
 }) {
-  const connectedVehicles = vehicles.filter((vehicle) => vehicle.id !== "warehouse");
+  const connectedVehicles = vehicles.filter((vehicle) => vehicle.id !== "warehouse" && vehicle.active);
 
   return (
     <>
@@ -678,7 +678,7 @@ function VehiclesView({
       />
       {connectedVehicles.length === 0 ? (
         <EmptyState icon={<Truck size={22} aria-hidden="true" />} title="No connected vehicles">
-          Add vehicles in the driver system before assigning inventory to them.
+          Add vehicles in BayBlaze Admin before assigning inventory to them.
         </EmptyState>
       ) : (
         <div className="grid gap-5 lg:grid-cols-2">
@@ -1879,7 +1879,7 @@ function AddProductFlow({
                 <Select label="Delivery vehicle" onChange={(event) => setVehicleId(event.target.value)} value={vehicleId}>
                   <option value="">Choose vehicle</option>
                   {vehicles
-                    .filter((vehicle) => vehicle.id !== "warehouse")
+                    .filter((vehicle) => vehicle.id !== "warehouse" && vehicle.active)
                     .map((vehicle) => (
                       <option key={vehicle.id} value={vehicle.id}>
                         {vehicle.label}
@@ -3301,7 +3301,7 @@ function AddVariantWizard({
               <Select label="Delivery vehicle" onChange={(event) => setVehicleId(event.target.value)} value={vehicleId}>
                 <option value="">Choose vehicle</option>
                 {vehicles
-                  .filter((vehicle) => vehicle.id !== "warehouse")
+                  .filter((vehicle) => vehicle.id !== "warehouse" && vehicle.active)
                   .map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
                       {vehicle.label}
@@ -3685,7 +3685,7 @@ function VariantContractCard({
             <Select label="Delivery vehicle" onChange={(event) => setVehicleId(event.target.value)} value={vehicleId}>
               <option value="">Choose vehicle</option>
               {vehicles
-                .filter((vehicle) => vehicle.id !== "warehouse")
+                .filter((vehicle) => vehicle.id !== "warehouse" && vehicle.active)
                 .map((vehicle) => (
                   <option key={vehicle.id} value={vehicle.id}>
                     {vehicle.label}
