@@ -45,6 +45,13 @@ export async function mutateInventory(mutation: InventoryMutation): Promise<Inve
   return waitForDemo(demoSnapshot);
 }
 
+export class InventorySessionError extends Error {
+  constructor() {
+    super("Your session has expired. Please sign in again.");
+    this.name = "InventorySessionError";
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     credentials: "include",
@@ -56,7 +63,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Inventory API request failed with HTTP ${response.status}: ${await readErrorMessage(response)}`);
+    const failure = await readErrorMessage(response);
+    if (response.status === 401 && failure.code === "INVENTORY_SESSION_INVALID") {
+      throw new InventorySessionError();
+    }
+    throw new Error(`Inventory API request failed with HTTP ${response.status}: ${failure.message}`);
   }
 
   return response.json() as Promise<T>;
@@ -66,10 +77,13 @@ async function readErrorMessage(response: Response) {
   const fallback = response.statusText || "No response details returned.";
 
   try {
-    const body = (await response.json()) as { message?: unknown };
-    return typeof body.message === "string" && body.message.trim() ? body.message.trim() : fallback;
+    const body = (await response.json()) as { message?: unknown; code?: unknown };
+    return {
+      code: body.code,
+      message: typeof body.message === "string" && body.message.trim() ? body.message.trim() : fallback,
+    };
   } catch {
-    return fallback;
+    return { code: undefined, message: fallback };
   }
 }
 

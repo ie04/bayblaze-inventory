@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
@@ -33,7 +33,7 @@ import {
   StatusBadge,
   Textarea,
 } from "./components/ui";
-import { loadInventory, mutateInventory } from "./lib/inventoryApi";
+import { InventorySessionError, loadInventory, mutateInventory } from "./lib/inventoryApi";
 import {
   clearInventorySession,
   completeInventoryGoogleLogin,
@@ -85,25 +85,28 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  function applySession(nextSession: InventorySession | null) {
+  const applySession = useCallback((nextSession: InventorySession | null) => {
     setSession(nextSession);
     if (!nextSession) {
       clearInventorySession();
       setSnapshot(null);
     }
-  }
+  }, []);
 
-  async function refreshInventory() {
+  const refreshInventory = useCallback(async () => {
     setError("");
     setLoading(true);
     try {
       setSnapshot(await loadInventory());
     } catch (caught) {
+      if (caught instanceof InventorySessionError) {
+        applySession(null);
+      }
       setError(caught instanceof Error ? caught.message : "Inventory load failed.");
     } finally {
       setLoading(false);
     }
-  }
+  }, [applySession]);
 
   async function applyMutation(...args: Parameters<typeof mutateInventory>) {
     setBusy(true);
@@ -113,6 +116,9 @@ function App() {
       setSnapshot(nextSnapshot);
       return nextSnapshot;
     } catch (caught) {
+      if (caught instanceof InventorySessionError) {
+        applySession(null);
+      }
       setError(caught instanceof Error ? caught.message : "Inventory update failed.");
       return null;
     } finally {
@@ -127,7 +133,7 @@ function App() {
 
     const timer = window.setTimeout(() => void refreshInventory(), 0);
     return () => window.clearTimeout(timer);
-  }, [session]);
+  }, [session, refreshInventory]);
 
   const variants = useMemo(() => flattenVariants(snapshot?.products ?? []), [snapshot]);
 
@@ -240,7 +246,7 @@ function App() {
   ) : null;
 
   if (!session) {
-    return <LoginScreen onAuthenticated={applySession} />;
+    return <LoginScreen onAuthenticated={applySession} sessionNotice={error} />;
   }
 
   return (
@@ -350,7 +356,10 @@ function App() {
   );
 }
 
-function LoginScreen({ onAuthenticated }: { onAuthenticated: (session: InventorySession) => void }) {
+function LoginScreen({ onAuthenticated, sessionNotice }: {
+  onAuthenticated: (session: InventorySession) => void;
+  sessionNotice: string;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -430,7 +439,8 @@ function LoginScreen({ onAuthenticated }: { onAuthenticated: (session: Inventory
             <span className="h-px flex-1 bg-[var(--bb-line)]" />
           </div>
 
-          <form className="space-y-4" onSubmit={submit}>
+          {sessionNotice ? <InlineNotice tone="warning">{sessionNotice}</InlineNotice> : null}
+            <form className="space-y-4" onSubmit={submit}>
             <Input
               autoComplete="email"
               icon={<Mail size={18} aria-hidden="true" />}

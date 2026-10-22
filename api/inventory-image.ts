@@ -45,7 +45,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authResult = await verifyInventoryAccount(req);
 
   if (!authResult.ok) {
-    return res.status(authResult.status).json({ message: authResult.message });
+    return res.status(authResult.status).json({
+      message: authResult.message,
+      ...(authResult.status === 401 ? { code: "INVENTORY_SESSION_INVALID" } : {}),
+    });
   }
 
   let upstreamResponse: Response;

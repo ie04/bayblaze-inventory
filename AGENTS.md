@@ -164,3 +164,16 @@ npm run lint
   but it must not become the owner of driver queues, driver live locations, or
   order delivery lifecycle status. Those remain driver/Medusa/IsoChronos
   integration concerns.
+
+## October 2026 Session Recovery
+
+- OVHcloud backend replacement changed account session signing secrets; sessions
+  saved before the rebuild can no longer be verified. Expired sessions also
+  require reauthentication.
+- Inventory and inventory-image proxies tag account-authentication 401 responses
+  with `code: INVENTORY_SESSION_INVALID`. Upstream service-token 401 responses
+  must not receive that code.
+- The browser clears rejected account sessions and returns to sign-in with a
+  readable session-expired notice. Preserve session state for 403 access-denied,
+  5xx service failures, and upstream credential errors; never retry mutations
+  automatically after reauthentication.
