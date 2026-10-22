@@ -177,3 +177,20 @@ npm run lint
   readable session-expired notice. Preserve session state for 403 access-denied,
   5xx service failures, and upstream credential errors; never retry mutations
   automatically after reauthentication.
+
+## October 2026 Inventory Service Credential Sync
+
+- Inventory Vercel production and preview `BAYBLAZE_API_SERVICE_TOKEN` were
+  synchronized with the running OVHcloud API's canonical service token after
+  discovering the inventory deployment setting predated the VPS rebuild.
+  Redeploy inventory after changing server environment variables.
+- Two authentication boundaries must be checked independently: the browser's
+  account session is verified at `/v1/auth/me`; Vercel then calls `/v1/inventory`
+  using its server-only service token. Repairing a browser session does not
+  synchronize the Vercel service credential.
+- Never expose the shared service token through a `VITE_*` variable or commit it.
+  Read it securely from the backend runtime and pass it to Vercel via stdin.
+- The Vercel project is `bayblaze-inventory`, production domain
+  `stock.bayblaze.net`. Explicit production deployment is available with
+  `vercel deploy --prod --yes` from a linked checkout; verify the custom-domain
+  alias after deployment rather than assuming a push activated production.
