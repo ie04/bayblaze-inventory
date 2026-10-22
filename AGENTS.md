@@ -65,10 +65,10 @@ creating new primitives.
   the universal BayBlaze account routes: `POST /v1/auth/login`,
   `POST /v1/auth/google/start`, and `POST /v1/auth/google/callback`. The
   browser stores the returned session only after verifying the account has the
-  `employee` badge plus the `inventory` role.
+  `inventory` role on an enabled account.
 - The Vercel `/api/inventory` and `/api/inventory-image` boundaries must verify
   the browser bearer token through `bayblaze-api` `GET /v1/auth/me` and require
-  `employee` + `inventory` before using `BAYBLAZE_API_SERVICE_TOKEN` for
+  an enabled account with `inventory` before using `BAYBLAZE_API_SERVICE_TOKEN` for
   upstream inventory calls.
 - Google OAuth redirect URI for the inventory PWA:
   `https://stock.bayblaze.net/auth/google/callback` in production and the
@@ -191,3 +191,14 @@ npm run lint
   `stock.bayblaze.net`. Explicit production deployment is available with
   `vercel deploy --prod --yes` from a linked checkout; verify the custom-domain
   alias after deployment rather than assuming a push activated production.
+
+## October 2026 Role-Only Account Authorization
+
+- Every enabled universal account can use customer features. Staff privileges
+  are explicit `roles: ["admin", "driver", "inventory"]` subsets; ordinary
+  customers have `roles: []`. `disabled` remains the account-wide access gate.
+- Authorization badges (`customer` / `employee`) are retired. Do not read,
+  write, display, or require them. Removing staff roles leaves customer access.
+- API middleware re-reads account permissions on requests, so revoking a role
+  does not depend on an old session expiring. Existing signed sessions remain
+  compatible; new sessions and account responses omit badges.

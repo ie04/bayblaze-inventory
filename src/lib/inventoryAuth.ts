@@ -5,11 +5,10 @@ export type InventorySession = {
 };
 
 type AccountRole = "admin" | "driver" | "inventory";
-type AccountBadge = "customer" | "employee";
 
 type AccountAuthResponse = {
   account: {
-    badges: AccountBadge[];
+    disabled: boolean;
     roles: AccountRole[];
   };
   session: InventorySession;
@@ -99,7 +98,7 @@ async function publicApiPost<T>(path: string, body: unknown) {
 }
 
 function assertInventoryAccount(account: AccountAuthResponse["account"]) {
-  if (!account.badges.includes("employee") || !account.roles.includes("inventory")) {
+  if (account.disabled || !account.roles.includes("inventory")) {
     throw new Error("This BayBlaze account does not have inventory access.");
   }
 }

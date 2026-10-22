@@ -121,7 +121,7 @@ async function verifyInventoryAccount(req: VercelRequest) {
 
   const payload = (await response.json().catch(() => ({}))) as {
     account?: {
-      badges?: string[];
+      disabled?: boolean;
       roles?: string[];
     };
     message?: string;
@@ -135,7 +135,7 @@ async function verifyInventoryAccount(req: VercelRequest) {
     };
   }
 
-  if (!payload.account?.badges?.includes("employee") || !payload.account.roles?.includes("inventory")) {
+  if (!payload.account || payload.account.disabled || !payload.account.roles?.includes("inventory")) {
     return {
       ok: false as const,
       message: "Inventory access is required.",

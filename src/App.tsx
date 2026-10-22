@@ -423,7 +423,7 @@ function LoginScreen({ onAuthenticated, sessionNotice }: {
             </div>
           </div>
           <p className="text-sm font-semibold leading-6 text-[var(--bb-muted)]">
-            Use a BayBlaze employee account with the inventory role.
+            Use a BayBlaze account with the inventory role.
           </p>
 
           {error ? <ErrorState>{error}</ErrorState> : null}
